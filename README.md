@@ -2,7 +2,7 @@
 This repository contains the software artifacts for the paper.
 
 The repository is structured into three parts:
-```bash
+```text
 -- prl
    Containing scripts to generate and plot the markov matrices 
    (Sec. 5.2 / Figs. 6, 16-18)
