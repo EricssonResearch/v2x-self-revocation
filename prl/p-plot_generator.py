@@ -68,10 +68,7 @@ def main(
     p_range = [honest1]
     p_range.extend(honest1_attacker1)
     p_range.append(honest2)
-    # p_range.extend(honest1_attacker2)
     p_range.extend(honest2_attacker1)
-    # p_range.extend(honest2_attacker2)
-    # p_range = sorted(p_range)
     print(p_range)
 
     attacker_occurrences = ['1%', '2%', '5%', '10%', '20%']
@@ -104,11 +101,6 @@ def main(
 
     print(f'Parsing all stationary distribution files in {cache_dir}')
     all_dicts = []
-    # for f in os.listdir(cache_dir):
-    #     if str(f).endswith('stat_dist') and fits_criteria(str(f)):
-    #         print(f'Including {f}')
-    #         with (cache_dir / f).open('rb') as f:
-    #             all_dicts.append(pickle.load(f))
     for expected_p in p_range:
         for expected_n in n_range:
             for expected_e in e_range:
@@ -165,13 +157,8 @@ def main(
     for i in range(len(plot_data)):
         ax.scatter(plot_range, plot_data[i], marker=marker_styles[i])
 
-    # dot_prod[0].plot(kind='bar')
-    # ax.axis('equal')
-
-    # plt.yticks(range(0, max(all_percentiles_set)+1))
     plt.xticks(plot_range, plot_xlabels, rotation=45)
     plt.legend(plot_labels, loc="upper left")
-    # plt.title(f'Maximum PRL sizes for n={n_start} and varying probabilities of revocation')
 
     import tikzplotlib
     filename = f"n{n_range[0]}_e{e_range[0]}"

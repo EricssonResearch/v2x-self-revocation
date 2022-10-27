@@ -139,26 +139,9 @@ def main(
         matrix = [[func(i, j) for j in range(actual_n)] for i in range(actual_n)]
         # For pretty printing, use pandas and add a sum column
         original_df = DataFrame(matrix)
-        #
-        # col_sums = []
-        # for i in range(actual_n):
-        #     val = 0
-        #     for j in range(actual_n):
-        #         val += matrix[j][i]
-        #     col_sums.append(val)
 
-        # df_cols = DataFrame({'Sum': col_sums})
-        # df_cols = df_cols.join(DataFrame({'Sum_probs': [i/actual_n for i in col_sums]}))
-
-        # df = pandas.concat([df,df_cols.transpose()])
         df = original_df.copy()
         df.loc[:,'Sum'] = df.sum(axis=1)
-        # col_sum = df.sum(axis=0)
-        # col_sum_n = col_sum.divide(actual_n)
-        # df.loc['Sum', :] = col_sum
-        # df.loc['Sum/n', :] = col_sum_n
-
-        # df = df.join(DataFrame({'Sum': [df[i].sum() for i in iter(df)]}))
 
         print(df)
         print('')
@@ -197,7 +180,8 @@ def main(
 
     # Next, calculate the stationary distribution of the markov matrix
     # This will give us the distribution that occurs after an arbitrary amount of steps (after ramp up period)
-
+    
+    # People have posted and asked about similar things before, we don't have to reinvent the wheel here
     # https://stackoverflow.com/a/67172991
     # https://stephens999.github.io/fiveMinuteStats/stationary_distribution.html
     """
@@ -233,7 +217,7 @@ def main(
     print(sol2)
     print(np.sum(sol2[0]))
 
-    print('diff')
+    print('diff between two calculations')
     print(sol2[0] - sol)
     print(np.sum(sol2[0] - sol))
 
@@ -268,7 +252,6 @@ def main(
     if plot:
         import matplotlib.pyplot as plt
         plt.bar(range(actual_n), sol2[0])
-        # dot_prod[0].plot(kind='bar')
         plt.title(f'Probability for each PRL size for n={n}, p={p}, e={e}')
 
         if plot_file:

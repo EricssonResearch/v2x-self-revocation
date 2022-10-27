@@ -137,14 +137,8 @@ def main(
     for i in range(len(plot_data)):
         ax.scatter(plot_range, plot_data[i], marker=marker_styles[i])
 
-    # dot_prod[0].plot(kind='bar')
-    # ax.axis('equal')
-
-    # plt.yticks(range(0, max(all_percentiles_set)+1))
-    # plt.xticks(plot_range, plot_xlabels, rotation=45)
     plt.legend(plot_labels, loc="upper left")
-    # plt.title(f'Maximum PRL sizes for n={n_start} and varying probabilities of revocation')
-
+    
     import tikzplotlib
     filename = f"n-plot_e{e_range[0]}"
     tikzplotlib.save(filename + '.tex')
