@@ -1,1 +1,95 @@
-# PRL as a Markov Model
+# Modeling the PRL size as a markov chain
+This directory contains the scripts that were used to calculate, aggregate, and plot the figures regarding the markov model.
+
+At the core of this directory stands the `main.py` script that takes different parameters for `n`, `p`, and `e` (in the paper called T_prl).
+Based on these parameters, the script calculates the G and L probabilities, and combines them into the markov matrix.
+Finally, it solves the linear equation to gain the stationary distribution and plots the individual probabilities per state.
+In the paper, multiple of these stationary distributions were then aggregated into a single plot and the plots of individual state probabilities were not used.
+
+Since runs can take a few minutes, the script allows to set up a cache directory where the markov matrix is stored as a Python pickle file. 
+This allows the other scripts to quickly parse and plot multiple runs without needing to recompute the whole matrices.
+
+## Setup
+The scripts all utilize Python. Our system runs Python 3.8.10 and newer Python versions may not work properly due to changes to the asyncio library used by the `generate_plots.py` script. 
+This should only affect convenient generation of multiple settings at the same time and should not impact the core `main.py` script.
+
+To get started, simply install the dependencies in the `requirements.txt` file `pip3 install -r requirements.txt`.
+
+## Generating a single stationary distribution
+Run one iteration of the main script like this:
+```bash
+python3 main.py -n 400 -p 0.0001 -e 300 --cache-dir=cached/ --force-cached -g
+```
+`--help` gives more information but `n`, `p`, and `e` (T_prl) are defined as in the paper while `--cache-dir` defines the caching directory, `--force-cached` prevents recomputation and only relies on the data already in the `cached` folder, and `-g` instructs to plot the stationary distribution of these parameters.
+
+## Generating the first plot of the paper
+The first plot of the paper depicts multiple scenarios that vary in their probability and visualizes different percentiles.
+The script `p-plot_generator.py` performs this operation, generates a plot and also creates a tikz export. Simply run it with `python3 p-plot_generator.py` (assuming the cached markov matrices are in `cached`).
+
+### Reproducing the data used in the first plot
+
+The appendix explains more in-depth how the probabilities were calculated.
+For the plots, the following probabilities were used:
+```text
+Scenario 1: vehicles get revoked at least once a day with 1% probability
+0.000000116323325
+0.000007813830433
+0.000015511337541
+0.000038603858866
+0.000077091394407
+0.000154066465489
+
+Scenario 2: vehicles get revoked at least once a day with 99% probability
+0.000053299160406
+0.000060464839143
+0.000067630517880
+0.000089127554093
+0.000124955947779
+0.000196612735153
+```
+
+Then multiple plots can be generated at the same time with the `generate_plots.py` script (careful, potentially only with python versions before 3.9 or 3.10).
+```bash
+python3 generate_plots.py -e 270 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489
+python3 generate_plots.py -e 270 -n 400 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+```
+
+
+## Generating the appendix plots of the paper
+Besides varying the probability, the paper also contains plots that vary `n` and `e` (T_prl).
+This is done by the scripts `python3 e-plot_generator.py` and `python3 n-plot_generator.py` that work in a similar fashion as the previous plot script.
+
+### Reproducing the data used in the appendix plots
+For the appendix plots we used the following parameters:
+```bash
+#! bin/bash
+python3 generate_plots.py -e 270 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489
+python3 generate_plots.py -e 270 -n 400 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 50 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 100 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 150 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 200 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 250 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 300 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 350 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 400 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 450 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 500 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 500 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 600 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 700 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 800 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 900 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 1000 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 300 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 270 -n 200 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+```
+
+## Generating the visualization of a markov matrix
+The `main.py` script can also generate the tikz graph that is used in the appendix to visualize our markov chain.
+Simply call it with the `-f tikz_file_name.tex` option. Beware that large graphs may crash PDFtex or are not visualized correctly.
+But since large graphs are not very readable anyway, we opted for small parameters yielding to the command:
+```bash
+python3 main.py -n 3 -p 0.01 -e 2 -f tikz-graph.tex
+```
