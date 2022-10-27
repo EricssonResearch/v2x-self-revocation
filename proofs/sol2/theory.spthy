@@ -1,0 +1,492 @@
+theory RevocationSolution2
+begin
+
+builtins: signing, multiset
+
+/*
+ * Predicates used in the lemmas.
+ */
+predicates:
+    LessThan(x,y) <=> Ex z . x + z = y
+  , GreaterThan(x,y) <=> Ex z . x = y + z
+  , GreaterEqualThan(x,y) <=> x = y | Ex z . x = y + z
+  , IsNotInList(x,y) <=> 
+        not x = y
+        & (not Ex a . a + x = y)
+        & (not Ex b . x + b = y)
+        & (not Ex c d . c + x + d = y)
+  , IsInList(x,y) <=> 
+        x = y
+        | (Ex a . a + x = y)
+        | (Ex b . x + b = y)
+        | (Ex c d . c + x + d = y)
+
+/*
+ * Restrictions used in the rules.
+ */
+restriction Equality:
+    "All x y #i . Eq(x,y)@i ==> x = y"
+
+restriction OnlyOnce:
+    "All x #i #j . OnlyOnce(x)@i & OnlyOnce(x)@j ==> #i = #j"
+
+restriction GreaterEqualThan:
+    "All x y #i . GreaterEqualThan(x,y)@i ==> x = y | Ex z . x = y + z"
+    
+restriction IsInList:
+    "
+    All x y #i . IsInList(x, y)@i ==>
+        x = y
+        | (Ex a . a + x = y)
+        | (Ex b . x + b = y)
+        | (Ex c d . c + x + d = y)
+    "
+
+restriction IsNotInList:
+    "
+    All x y #i . IsNotInList(x, y)@i ==> 
+        not x = y
+        & (not Ex a . a + x = y)
+        & (not Ex b . x + b = y)
+        & (not Ex c d . c + x + d = y)
+    "
+
+restriction IsValidPseudonym:
+    "
+    All ps #i . IsValidPseudonym(ps)@i ==> 
+        not (Ex e #k . PseudonymRevoked(ps, e)@k & k<i)
+    "
+
+restriction IsLatestEpoch:
+    "
+    All x e #i . IsLatestEpoch(x, e)@i ==>
+        not (Ex e2 #j . NewEpoch(x, e2)@j & j<i & GreaterThan(e2, e))
+    "
+
+restriction IsLatestPRL:
+    "
+    All cnt #i . IsLatestPRL(cnt)@i ==>
+        not (Ex prl cnt2 #j . PRLUpdated(prl, cnt2)@j & j<i & GreaterThan(cnt2, cnt))
+    "
+
+ /* Parameters
+ *
+ * tol: gives a validity period on V2V messages and heartbeats.
+ *
+ * These parameters are modeled to have a non-deterministic value.
+ *
+ * NOTE: In Tamarin, tol cannot be equal to zero (cannot create an empty list), 
+ *       so we need to "shift left" all values by one, to also verify the case 
+ *       "tol == 0". Therefore, we need to adjust equations 12-20 of the 
+ *       paper, replacing `tol` with `tol - 1` in the Tamarin model. Hence, to 
+ *       map the model back to equations 12-20, we need to do the opposite,
+ *       replacing `tol` with `tol + 1`.
+ */
+
+ rule init_parameters:
+    [
+    ]
+    --[ 
+        /* restrictions */
+        OnlyOnce('init_parameters')
+    ]->
+    [
+        TolTmp('1')
+    ]
+
+rule increment_tol:
+    [
+        TolTmp(tol)
+    ]
+    --[ 
+    ]->
+    [
+        TolTmp(tol + '1')
+    ]
+
+/* 
+ * This rule initializes our system, creating the necessary facts 
+ * for all the other rules.
+ */
+rule Init:
+  let e = '1'
+      prl = '0'
+      ps = pk(~ps_key)
+  in
+      [   
+          Fr(~ps_key)
+        , Fr(~ltk)
+        , TolTmp(tol)
+      ]
+      --[ 
+          /* restrictions */
+          OnlyOnce('Init')
+          /* action facts */
+        , SystemInitialized(tol)
+        , NewEpoch('TC', e)
+        , NewEpoch('RA', e)
+        , PRLUpdated(prl, '1')
+      ]->
+      [
+          !Epoch('TC', e)
+        , !Epoch('RA', e)
+        , !Parameters(tol)
+        , !Pseudonym(ps)
+        , !Ltk(ps, ~ps_key)
+        , !Ltk('RA', ~ltk)
+        , !Pk('RA', pk(~ltk))
+        , !PRL(prl, '1')
+        // public stuff
+        , Out(pk(~ltk))
+        , Out(ps)
+      ]
+
+/* 
+ * This rule models a 3rd party entity (vehicle or not) processing a message
+ * signed by the TC at epoch `e_v2v`.
+ * 
+ * If the signature is correct and the message is not too old, the message is 
+ * accepted and processed.
+
+ */
+rule process_message:
+    let msg = <m, e_v2v>
+    in
+        [
+          In(<msg, signature>)
+        , !Parameters(tol)
+        , !Pseudonym(ps)
+        , !Epoch('RA', e)
+        ]
+        --[ 
+          /* restrictions */
+          // signature check
+          Eq(verify(signature, msg, ps), true)
+          // epoch bound checks
+        , GreaterEqualThan(e_v2v + tol, e + '1')
+        , GreaterEqualThan(e + tol, e_v2v + '1')
+          /* action facts */
+        , MessageAccepted(msg, ps, e)
+        ]->
+        [
+        ]    
+
+/*
+ * This rule allows the TC to generate a new V2V message.
+ * The content of the message is not important and we model it as a fresh value.
+ *
+ * The TC signs the message iff the pseudonym is still valid.
+ */
+rule TC_sign_message:
+    let msg = <~m, e>
+    in
+        [   
+          !Epoch('TC', e)
+        , !Pseudonym(ps)
+        , !Ltk(ps, ps_key)
+        , Fr(~m)
+        ]
+        --[ 
+          /* restrictions */
+          IsValidPseudonym(ps)
+        , IsLatestEpoch('TC', e)
+          /* action facts */
+        , Signed(msg, ps)
+        ]->
+        [
+          Out(<msg, sign(msg, ps_key)>)
+        ]
+
+/*
+ * This rule allows the TC to process a heartbeat received from the channel.
+ * This is the variant where the PRL does not include the pseudonym `ps`.
+ *
+ * The TC processes the heartbeat iff the heartbeat has a valid signature and 
+ * its epoch is >= the one stored in the TC, up to an upper bound given by the
+ * tolerance `tol`.
+ *
+ * If all checks succeed, the TC advances to epoch `e_hb`
+ */
+rule TC_process_heartbeat_no_revoke:
+    let HB = <prl, e_hb>
+    in
+        [   
+            !Epoch('TC', e)
+          , !Parameters(tol)
+          , !Pseudonym(ps)
+          , !Pk('RA', pkRA)
+          , In(<HB, signature>)
+        ]
+        --[ 
+            /* restrictions */
+            IsLatestEpoch('TC', e)
+            // signature check
+          , Eq(verify(signature, HB, pkRA), true)
+            // tolerance checks
+          , GreaterEqualThan(e_hb, e)
+          , GreaterEqualThan(e + tol, e_hb)
+            // pseudonyms must not be in list
+          , IsNotInList(ps, prl)
+            /* action facts */
+          , HeartbeatProcessed(HB)
+          , NewEpoch('TC', e_hb)
+        ]->
+        [
+            !Epoch('TC', e_hb)
+        ]
+
+/*
+ * This rule allows the TC to process a heartbeat received from the channel.
+ * This is the variant where the PRL includes the pseudonym `ps`.
+ *
+ * The TC processes the heartbeat iff the heartbeat has a valid signature and 
+ * its epoch is >= the one stored in the TC, up to an upper bound given by the
+ * tolerance `tol`.
+ *
+ * If all checks succeed, the TC revokes `ps` and advances to epoch `e_hb`.
+ */
+rule TC_process_heartbeat_revoke:
+    let HB = <prl, e_hb>
+    in
+        [   
+            !Epoch('TC', e)
+          , !Parameters(tol)
+          , !Pseudonym(ps)
+          , !Pk('RA', pkRA)
+          , In(<HB, signature>)
+        ]
+        --[ 
+            /* restrictions */
+            IsLatestEpoch('TC', e)
+            // signature check
+          , Eq(verify(signature, HB, pkRA), true)
+            // tolerance checks
+          , GreaterEqualThan(e_hb, e)
+          , GreaterEqualThan(e + tol, e_hb)
+            // pseudonyms must be in list
+          , IsInList(ps, prl)
+            /* action facts */
+          , HeartbeatProcessed(HB)
+          , PseudonymRevoked(ps, e)
+          , NewEpoch('TC', e_hb)
+        ]->
+        [
+            !Epoch('TC', e_hb)
+        ]
+    
+/*
+ * This rule allows the RA to generate a new heartbeat. The heartbeat will
+ * include the latest PRL and epoch available.
+ *
+ * This rule is called once per heartbeat, i.e., we do not generate the same
+ * heartbeat multiple times. In any case, the network channel is modeled such
+ * that replay attacks are possible, hence we are not restricting the attacker's
+ * capabilitities.
+ */
+rule RA_generate_heartbeat:
+    let HB = <prl, e>
+    in
+        [   
+            !Epoch('RA', e)
+          , !PRL(prl, cnt)
+          , !Ltk('RA', ltk)
+        ]
+        --[ 
+            /* restrictions */
+            IsLatestPRL(cnt)
+          , IsLatestEpoch('RA', e)
+          , OnlyOnce(<'generate_hb', HB>)
+            /* action facts */
+          , HeartbeatGenerated(HB)
+        ]->
+        [
+            Out(<HB, sign(HB, ltk)>)
+        ]
+
+/*
+ * This rule makes the RA revoke pseudonym `ps`. Here, for simplicity, we 
+ * retrieve `ps` from the `!Pseudonym` fact, since it is publicly known.
+ *
+ * This rule updates the PRL by adding `ps` to the list. We do this operation
+ * only once per pseudonym, i.e., we do not add the same pseudonym to the PRL
+ * multiple times.
+ */
+rule RA_issue_revocation:
+    [   
+        !Epoch('RA', e)
+      , !Pseudonym(ps)
+      , !PRL(prl, cnt)
+    ]
+    --[ 
+        /* restrictions */
+        IsLatestPRL(cnt)
+      , IsLatestEpoch('RA', e)
+      , OnlyOnce(<'issue_revocation', ps>)
+        /* action facts */
+      , RevocationIssued(ps, e)
+      , PRLUpdated(prl + ps, cnt + '1')
+    ]->
+    [
+        !PRL(prl + ps, cnt + '1')
+    ]
+
+/*
+ * This rule is used to advance the RA's current epoch by 1.
+ */
+rule RA_advance_epoch:
+    [
+        !Epoch('RA', e)
+    ]
+    --[ 
+        /* restrictions */
+        OnlyOnce(<'advance_epoch', e>)
+        /* action facts */
+      , NewEpoch('RA', e + '1')
+    ]->
+    [
+        !Epoch('RA', e + '1')
+    ]
+
+/* 
+ * this lemma checks if the TC can sign a message. 
+ */
+lemma sign_possible [heuristic=I]: exists-trace
+    "
+    Ex msg ps #i . Signed(msg, ps)@i
+    "
+
+/* 
+ * this lemma checks if the RA can generate a heartbeat.
+ */
+lemma generate_hb_possible [heuristic=I]: exists-trace
+    "
+    Ex hb #i . HeartbeatGenerated(hb)@i
+    "
+
+/* 
+ * this lemma checks if the RA can revoke `ps`. 
+ */
+lemma issue_revocation_possible [heuristic=I]: exists-trace
+    "
+    Ex ps e #i . RevocationIssued(ps, e)@i
+    "
+
+/* 
+ * this lemma checks if the TC can process a heartbeat.
+ */
+lemma processing_hb_possible [heuristic=I]: exists-trace
+    "
+    Ex hb #i . HeartbeatProcessed(hb)@i
+    "
+
+/* 
+ * this lemma checks if the TC can self-revoke `ps`. 
+ */
+lemma revocation_possible [heuristic=I]: exists-trace
+    "
+    Ex ps e #i . PseudonymRevoked(ps, e)@i
+    "
+
+/* 
+ * this lemma checks if a V2V message generated by `ps` can be processed
+ * by a 3rd party entity.
+ */
+lemma process_message_possible [heuristic=I]: exists-trace
+    "
+    Ex msg ps e #i . MessageAccepted(msg, ps, e)@i
+    "
+
+/* 
+ * The following lemmas ensure that the parameters are non-deterministic.
+ */
+
+lemma exists_par_tol_5 [heuristic=I]: exists-trace
+    "
+    Ex tol #i . SystemInitialized(tol)@i & tol = '1'+'1'+'1'+'1'+'1'
+    "
+
+lemma exists_par_tol_8 [heuristic=I]: exists-trace
+    "
+    Ex tol #i . SystemInitialized(tol)@i & tol = '1'+'1'+'1'+'1'+'1'+'1'+'1'+'1'
+    "
+
+/*
+ * This lemma checks that no signatures can be made by the TC after revoking
+ * `ps` (self-revocation).
+ */
+lemma no_signing_after_revoking_pseudonym [heuristic=I]:
+    "
+    All msg ps #i . Signed(msg, ps)@i ==>
+       not (Ex e2 #j . PseudonymRevoked(ps, e2)@j & j<i)
+    "
+
+/* 
+ * This lemma ensures that, after revocation of `ps`, all signatures made with
+ * `ps` cannot have an epoch bigger than e_rev
+ */
+lemma all_signatures_max_epoch_e_rev [heuristic=o "oracle.py"]:
+    "
+    All m ps e #i . Signed(<m, e>, ps)@i ==>
+        not (
+          Ex e_rev #j . RevocationIssued(ps, e_rev)@j 
+            & GreaterThan(e, e_rev)
+        )
+    "
+
+/* 
+ * Property (I): "effective revocation"
+ *
+ * If `ps` is revoked by the RA at epoch e_rev, a 3rd party entity will not 
+ * process any more V2V messages coming from that TC starting from 
+ * epoch == e_rev + tol + 1.
+ *
+ * This in Tamarin is translated to the following lemma: "it does not exist
+ * a state where a `RevocationIssued` fact is generated at epoch e_rev and a
+ * `MessageAccepted` fact is generated at epoch > e_rev + tol".
+ */
+lemma effective_revocation [heuristic=o "oracle.py"]:
+    "
+    All msg ps e #i . MessageAccepted(msg, ps, e)@i ==>
+        Ex tol #j . SystemInitialized(tol)@j & j<i
+        &
+        not (
+          Ex e_rev #k . RevocationIssued(ps, e_rev)@k 
+            & GreaterEqualThan(e, e_rev + tol)
+        ) 
+    "
+  
+/* 
+ * Property (II): "time in PRL"
+ *
+ * If `ps` is revoked by the RA at epoch e_rev but the TC does not self-revoke it,
+ * the TC will auto-revoke all credentials if it processes any HB or V2V message
+ * containing epoch >= e_rev + tol + 2.
+ * This proves that `ps` can be safely removed from the PRL as soon as the RA's
+ * epoch reaches e_rev + tol + 2.
+ *
+ * This in Tamarin is translated to the following lemma: "it does not exist
+ * a state where a `RevocationIssued` fact is generated at epoch e_rev and a
+ * `HeartbeatProcessed` fact is generated for a heartbeat containing 
+ * epoch >= e_rev + tol + 2, unless the TC has successfully self-revoked `ps` 
+ * before generating `HeartbeatProcessed`".
+ */
+lemma no_heartbeats_processed_after_tolerance [heuristic=o "oracle.py"]:
+    "
+    // for all heartbeats processed
+    All prl e_hb #i . HeartbeatProcessed(<prl, e_hb>)@i ==>
+        Ex tol #j . SystemInitialized(tol)@j & j<i
+        &
+        (
+          // either e_hb is < e_rev + tol + 2
+          not (
+            Ex ps e_rev #k . RevocationIssued(ps, e_rev)@k
+              & k<i
+              & GreaterEqualThan(e_hb, e_rev + tol + '1')
+          )
+          |
+          // or the pseudonym was already revoked before
+          (Ex ps e #k . PseudonymRevoked(ps, e)@k & k<i)
+        )
+    "
+
+end

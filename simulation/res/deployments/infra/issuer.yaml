@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: issuer
+  namespace: v2x
+spec:
+  selector:
+    matchLabels:
+      run: issuer
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: v2x
+        run: issuer
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        workerNode: "yes"
+      containers:
+      - name: issuer
+        image: selfrevocation/e2e-sim-issuer:{VERSION}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80 
+        envFrom:
+          - configMapRef:
+              name: system
+        volumeMounts:
+        - name: key
+          mountPath: "/etc/credentials"
+          readOnly: true
+        - mountPath: /logs
+          name: nfs
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: key
+        secret:
+          secretName: ra-keys
+          optional: false
+          items:
+          - key: public
+            path: ra_public.pem
+      - name: nfs
+        hostPath:
+          path: /mnt/nfs-disk-2/v2x
+---
+apiVersion: v1
+kind: Service
+metadata: 
+  name: issuer
+  namespace: v2x
+spec:
+  ports: 
+    - name: http
+      port: 80 
+      targetPort: 80 
+      protocol: TCP
+  selector:
+    run: issuer

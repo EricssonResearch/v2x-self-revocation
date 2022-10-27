@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporter
+  namespace: v2x
+spec:
+  selector:
+    matchLabels:
+      run: reporter
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: v2x
+        run: reporter
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        workerNode: "yes"
+      containers:
+      - name: reporter
+        image: selfrevocation/e2e-sim-reporter:{VERSION}
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 9000
+            protocol: UDP
+        envFrom:
+          - configMapRef:
+              name: system
+        volumeMounts:
+        - mountPath: /logs
+          name: nfs
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "500m"
+          limits:
+            memory: "128Mi"
+            cpu: "1"
+      volumes:
+      - name: nfs
+        hostPath:
+          path: /mnt/nfs-disk-2/v2x

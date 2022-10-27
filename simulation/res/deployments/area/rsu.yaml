@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rsu
+  namespace: v2x
+spec:
+  selector:
+    matchLabels:
+      run: rsu
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: v2x
+        run: rsu
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        workerNode: "yes"
+      containers:
+      - name: rsu
+        image: selfrevocation/e2e-sim-rsu:{VERSION}
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 8000
+            protocol: UDP
+        envFrom:
+          - configMapRef:
+              name: system
+        volumeMounts:
+        - mountPath: /logs
+          name: nfs
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+      volumes:
+      - name: nfs
+        hostPath:
+          path: /mnt/nfs-disk-2/v2x

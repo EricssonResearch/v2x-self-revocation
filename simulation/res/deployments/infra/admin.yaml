@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+  namespace: v2x
+spec:
+  selector:
+    matchLabels:
+      run: admin
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: v2x
+        run: admin
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        workerNode: "yes"
+      containers:
+      - name: admin
+        image: yauritux/busybox-curl
+        imagePullPolicy: IfNotPresent
+        command: ["sleep"]
+        args: ["3600"]
+        volumeMounts:
+        - mountPath: /logs
+          name: nfs
+      volumes:
+      - name: nfs
+        hostPath:
+          path: /mnt/nfs-disk-2/v2x
