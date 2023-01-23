@@ -2,7 +2,7 @@ IMAGE           ?= selfrevocation/tamarin
 VERSION         ?= v1.6.1
 NAME            ?= tamarin
 MODEL           ?= sol1
-THREADS         ?= 8 # $(shell nproc)
+THREADS         ?= $(shell nproc)
 
 ENV              = -e LC_ALL=C.UTF-8
 VOLUME           = $(shell cd $(MODEL); pwd)
