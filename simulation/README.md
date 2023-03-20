@@ -12,7 +12,9 @@ A visual representation of the simulation is provided by the `web` component,
 which runs a web server on port 80. This is a pretty simple web app that is only
 intended for demonstrative purposes, and for best results it is recommended to
 not exceed 30-40 virtual vehicles and 10 groups in total, and no more than 16
-vehicles per group on average.
+vehicles per group on average. The web application is exposed on port 8080 in
+Docker Compose, while port forwarding can be used in Kubernetes via the `make
+port_forward` command.
 
 ## Quick start with Docker Compose
 
@@ -33,7 +35,11 @@ This requires a running [Kubernetes](https://kubernetes.io/) cluster reachable
 with `kubectl`. A [minikube](https://minikube.sigs.k8s.io/docs/) environment
 also works.
 
-**NOTE:** pods are configured to run on K8s nodes with label `workerNode=yes`.
+**NOTE 1:** Pods use multicast for communication. Therefore, make sure your
+Kubernetes network plugin supports multicast in order to run the simulation
+correctly.
+
+**NOTE 2:** pods are configured to run on K8s nodes with label `workerNode=yes`.
 So, either make sure nodes have such label or remove this restriction from the
 resource files.
 
@@ -41,7 +47,7 @@ resource files.
 # (if minikube) add label to node
 kubectl label nodes minikube workerNode=yes
 
-# run simulation
+# run simulation. All resources are deployed in the `v2x` namespace
 make run_kubernetes
 
 # cleanup
