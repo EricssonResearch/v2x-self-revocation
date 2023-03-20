@@ -515,9 +515,9 @@ lemma all_messages_accepted_within_tolerance [reuse, heuristic=o "oracle.py"]:
     "
 
 /*
- * This lemma extends `all_signatures_before_t` by considering V2V messages
- * accepted by a 3rd party entity, making sure that the timestamp included in
- * such V2V messages is not bigger than T_sign for revoked pseudonyms.
+ * This lemma checks V2V messages accepted by a 3rd party entity, making sure 
+ * that the timestamp included in such V2V messages is not bigger than 
+ * t_rev + tv for revoked pseudonyms.
  *
  * Marked as reuse to prove property (I).
  */
@@ -540,9 +540,6 @@ lemma no_messages_accepted_with_timestamp_t_sign [reuse, heuristic=o "oracle.py"
  * process any more V2V messages coming from that TC starting from 
  * t_eff == t_rev + 2tv.
  *
- * This combines lemmas `all_signatures_before_t` and 
- * `no_messages_accepted_with_timestamp_t`
- *
  * This in Tamarin is translated to the following lemma: "it does not exist
  * a state where a `RevocationIssued` fact is generated at time t_rev and a
  * `MessageAccepted` fact is generated at a time >= t_rev + tv + tv".
@@ -563,12 +560,12 @@ lemma effective_revocation [heuristic=o "oracle.py"]:
  * Property (II): "time in PRL"
  *
  * If `ps` is revoked by the RA at time t_rev but the TC does not self-revoke it,
- * the TC will be in an auto-revoked state starting from t_prl == t_rev + tv.
- * This proves that `ps` can be safely removed from the PRL starting from T_prl.
+ * the TC will be in an auto-revoked state after t_prl == t_rev + tv has passed.
+ * This proves that `ps` can be safely removed from the PRL after T_prl.
  *
  * This in Tamarin is translated to the following lemma: "it does not exist
  * a state where a `RevocationIssued` fact is generated at time t_rev and a
- * `NewOperation` fact is generated at a time >= t_rev + tv".
+ * `NewOperation` fact is generated at a time > t_rev + tv".
  */
 lemma no_operations_after_timeout [heuristic=o "oracle.py"]:
     "
