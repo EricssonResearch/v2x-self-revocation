@@ -1,24 +1,20 @@
 scenarios:
   - name: scenario-a1
     env:
-      USE_EPOCHS: 0
-      T_R: 240
+      TRUSTED_TIME: 0
       T_V: 30
   - name: scenario-a2
     env:
-      USE_EPOCHS: 0
-      T_R: 40
-      T_V: 10
+      TRUSTED_TIME: 0
+      T_V: 150
   - name: scenario-b1
     env:
-      USE_EPOCHS: 1
-      E_TOL: 0
-      T_E: 150
+      TRUSTED_TIME: 1
+      T_V: 30
   - name: scenario-b2
     env:
-      USE_EPOCHS: 1
-      E_TOL: 1
-      T_E: 15
+      TRUSTED_TIME: 1
+      T_V: 150
 runs:
   - name: 1-honest
     env:
@@ -26,25 +22,21 @@ runs:
       TC_STORE_LAST_PRL: 0
   - name: 2-smart
     env:
-      ATTACKER_LEVEL: smart
-      TC_STORE_LAST_PRL: 0
-  - name: 3-smarter
-    env:
       ATTACKER_LEVEL: smarter
       TC_STORE_LAST_PRL: 0
-  - name: 4-blind
+  - name: 3-blind
     env:
       ATTACKER_LEVEL: blind
       TC_STORE_LAST_PRL: 0
-  - name: 5-honest-prl
+  - name: 4-honest-prl
     env:
       ATTACKER_LEVEL: honest
       TC_STORE_LAST_PRL: 1
-  - name: 6-smarter-prl
+  - name: 5-smart-prl
     env:
       ATTACKER_LEVEL: smarter
       TC_STORE_LAST_PRL: 1
-  - name: 7-blind-prl
+  - name: 6-blind-prl
     env:
       ATTACKER_LEVEL: blind
       TC_STORE_LAST_PRL: 1

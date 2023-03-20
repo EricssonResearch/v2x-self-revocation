@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block container %}
+
+<div class="container">
+
+  <div id="time_div" class="row align-items-center">   
+
+    <div class="col-4 d-flex justify-content-start">
+        <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#show_revoked" aria-controls="offcanvasExample">
+          Toggle sidebar
+        </button>   
+      <div class="offcanvas offcanvas-start" data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="show_revoked" aria-labelledby="offcanvasScrollingLabel" style="width: 300px">
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title" id="show_revoked">Revoked pseudonyms</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <table id="revoked_info" width="100%">
+            <tr>
+              <th width="50%" class="td-left">ID</th>
+              <th width="50%" class="td-right">Rev. time (s)</th>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-4 d-flex justify-content-center">
+      <span id="cur_time"></span>
+    </div>
+
+    <div class="col-4 d-flex justify-content-end">
+      <button id="prev_btn" type="button" class="btn btn-primary control-btn" onclick="previous()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-rewind" viewBox="0 0 16 16">
+          <path d="M9.196 8 15 4.633v6.734L9.196 8Zm-.792-.696a.802.802 0 0 0 0 1.392l6.363 3.692c.52.302 1.233-.043 1.233-.696V4.308c0-.653-.713-.998-1.233-.696L8.404 7.304Z"/>
+          <path d="M1.196 8 7 4.633v6.734L1.196 8Zm-.792-.696a.802.802 0 0 0 0 1.392l6.363 3.692c.52.302 1.233-.043 1.233-.696V4.308c0-.653-.713-.998-1.233-.696L.404 7.304Z"/>
+        </svg>
+        Previous
+      </button>
+      <button id="play_btn" type="button" class="btn btn-primary control-btn" onclick="resume()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play" viewBox="0 0 16 16">
+          <path d="M10.804 8 5 4.633v6.734L10.804 8zm.792-.696a.802.802 0 0 1 0 1.392l-6.363 3.692C4.713 12.69 4 12.345 4 11.692V4.308c0-.653.713-.998 1.233-.696l6.363 3.692z"/>
+        </svg>
+        Play
+      </button>
+      <button id="pause_btn" type="button" class="btn btn-primary control-btn" onclick="pause()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause" viewBox="0 0 16 16">
+          <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>
+        </svg>
+        Pause
+      </button>
+      <button id="next_btn" type="button" class="btn btn-primary control-btn" onclick="next()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-fast-forward" viewBox="0 0 16 16">
+            <path d="M6.804 8 1 4.633v6.734L6.804 8Zm.792-.696a.802.802 0 0 1 0 1.392l-6.363 3.692C.713 12.69 0 12.345 0 11.692V4.308c0-.653.713-.998 1.233-.696l6.363 3.692Z"/>
+            <path d="M14.804 8 9 4.633v6.734L14.804 8Zm.792-.696a.802.802 0 0 1 0 1.392l-6.363 3.692C8.713 12.69 8 12.345 8 11.692V4.308c0-.653.713-.998 1.233-.696l6.363 3.692Z"/>
+          </svg>
+          Next
+      </button>
+    </div>
+
+  </div>
+
+  <div class="row align-items-center">
+    <svg id="map" width='1280px' height='720px'>
+      <defs>
+        <marker id="arrowhead" markerWidth="5" markerHeight="4" 
+      refX="5" refY="2" orient="auto">
+          <polygon points="0 0, 5 2, 0 4" />
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="row">
+    <span id="cur_hb" class="alert alert-secondary" role="alert">Heartbeat:</span>
+  </div>
+
+</div>
+
+<div class="toast hide" role="alert" aria-live="assertive" aria-atomic="true" id="myToast" style="position: absolute; top: 10px; right: 10px;">
+  <div class="toast-header">
+      <strong class="me-auto" id="toast_title"></strong>
+      <!--<small>10 mins ago</small>-->
+      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+  </div>
+  <div id="toast_body" class="toast-body">
+  </div>
+</div>
+
+<p id="num_groups" class="hidden">{{groups}}</p>
+<p id="t_eff" class="hidden">{{t_eff}}</p>
+{% endblock %}

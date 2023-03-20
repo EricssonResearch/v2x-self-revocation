@@ -60,15 +60,10 @@ class Attacker():
             return await self.__blind_send(hb, rate)
 
         if self.__level == AttackerLevel.BLIND_2:
-            # relay only one heartbeat per T_R (or T_E * (E_TOL + 1))
-            if conf.env("USE_EPOCHS"):
-                delay_on = False
-                max_delay = conf.env("T_E") * (conf.env("E_TOL") + 1)
-                delay = 0
-            else:
-                delay_on = conf.env("BLIND_2_ATTACKER_DELAYED")
-                max_delay = conf.env("T_R")
-                delay = utils.get_random_int(1, conf.env("T_V") - 1) if delay_on else 0
+            # relay only one heartbeat per T_V
+            delay_on = conf.env("BLIND_2_ATTACKER_DELAYED")
+            max_delay = conf.env("T_V")
+            delay = utils.get_random_int(1, max_delay - 1) if delay_on else 0
 
             now = utils.get_timestamp()
             if now - self.__last_sent >= max_delay - delay - 1:
@@ -83,10 +78,7 @@ class Attacker():
 
         if self.__level == AttackerLevel.BLIND_3:
             # always delay
-            if conf.env("USE_EPOCHS"):
-                delay = utils.get_random_int(1, conf.env("T_E") * (conf.env("E_TOL") + 1))
-            else:
-                delay = utils.get_random_int(1, conf.env("T_V") - 1)
+            delay = utils.get_random_int(1, conf.env("T_V") - 1)
 
             asyncio.create_task(self.__send_delayed(hb, delay))
             return True
@@ -102,7 +94,7 @@ class Attacker():
                     return await self.__drop(hb)
 
             # otherwise, relay immediately if SMART or postpone if SMARTER
-            if self.__level == AttackerLevel.SMART or conf.env("USE_EPOCHS"):
+            if self.__level == AttackerLevel.SMART:
                 return await self.__send(hb)
             else:
                 ts = decoded_hb["payload"]["iat"]
@@ -113,23 +105,18 @@ class Attacker():
         raise Exception(f"process_heartbeat not implemented for {self.__level.name}")
 
     async def __blind_send(self, hb, rate):
-        # this attacker does not make sense with epochs
-        if conf.env("USE_EPOCHS"):
-            return await self.__drop(hb)
-
-        t_r = conf.env("T_R")
-        t_t = conf.env("T_V")
+        t_v = conf.env("T_V")
         hb_period = conf.env("HEARTBEAT_PERIOD")
 
-        # number of heartbeats per T_R
-        hbs_per_t_r = int(t_r // hb_period)
+        # number of heartbeats per T_V
+        hbs_per_t_v = int(t_v // hb_period)
 
         # drop "rate" percentage of heartbeats
-        if utils.get_random_int(1, hbs_per_t_r) <= int(hbs_per_t_r * rate):
+        if utils.get_random_int(1, hbs_per_t_v) <= int(hbs_per_t_v * rate):
             return await self.__drop(hb)
         
         # delay by T_V - 1 (to avoid TC dropping the hb because too old)
-        asyncio.create_task(self.__send_delayed(hb, t_t - 1))
+        asyncio.create_task(self.__send_delayed(hb, t_v - 1))
         return True
 
     async def __send(self, hb):

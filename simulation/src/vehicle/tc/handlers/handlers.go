@@ -27,26 +27,24 @@ type Config struct {
 	Host			string		  `env:"HOSTNAME"`
 	LogLevel		string        `env:"LOG_LEVEL"`
 	LogToFile		bool		  `env:"LOG_TO_FILE"`
-	UseEpochs	 	bool          `env:"USE_EPOCHS"`
+	LogMaxSize		int	          `env:"LOG_MAX_SIZE"`
+	TrustedTime	 	bool          `env:"TRUSTED_TIME"`
 	NumPseudonyms 	int			  `env:"NUM_PSEUDONYMS"`
 	PsSize			int			  `env:"PSEUDONYM_SIZE"`
 	MinPsLifetime   int64		  `env:"MIN_PSEUDONYM_LIFETIME"`
 	HardRevocation  bool		  `env:"HARD_REVOCATION"`
 	StorePrl		bool		  `env:"TC_STORE_LAST_PRL"`
-	T_R      	 	int64         `env:"T_R"`
 	T_V      	 	int64         `env:"T_V"`
-	T_E      	 	int64         `env:"T_E"`
-	E_TOL      	 	int64         `env:"E_TOL"`
 }
 
 type TCState struct {
 	Ltp			string // long-term pseudonym
 	KeyRA		*jwk.Key // RA's public key
 	GroupKey 	[]byte // group key for V2V messages
-	PsMap		map[string]int64 // pseudonyms currently in use, with their creation time/epoch
+	PsMap		map[string]int64 // pseudonyms currently in use, with their creation time
 	PsOld		map[string]bool // pseudonyms expired or revoked
-	Epoch		int64 // epoch (used if UseEpochs is true)
-	TOut		int64 // auto-revocation timeout (used if UseEpochs is false)
+	Timestamp	int64 // current timestamp (used if TrustedTime is false)
+	TOut		int64 // autonomous revocation timeout (used if TrustedTime is true)
 	LastPrl		map[string]bool // PRL from last heartbeat received
 }
 
@@ -54,7 +52,7 @@ type JoinData struct {
 	Ltp			string // long-term pseudonym
 	KeyRA		string // RA's public key
 	GroupKey 	string // group key for V2V messages
-	Epoch		int64 // initial epoch (used if UseEpochs is true)
+	Timestamp	int64 // initial timestamp (used if TrustedTime is false)
 }
 
 var state *TCState
@@ -89,14 +87,6 @@ func (c Config) PublicKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c Config) Join(w http.ResponseWriter, r *http.Request) {
-	// calculate timestamp immediately to mitigate TOCTOU attacks
-	now := c.getTime()
-
-	if !c.hasTimeoutExpired() {
-		http.Error(w, "TC already enrolled in the network", http.StatusBadRequest)
-        return
-	}
-
 	var j JoinData
 
 	defer r.Body.Close()
@@ -137,7 +127,8 @@ func (c Config) Join(w http.ResponseWriter, r *http.Request) {
 		groupKey,
 		map[string]int64{},
 		map[string]bool{},
-		j.Epoch, now + c.T_R,
+		j.Timestamp,
+		j.Timestamp + c.T_V,
 		map[string]bool{},
 	}
 
@@ -146,7 +137,6 @@ func (c Config) Join(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c Config) Create(w http.ResponseWriter, r *http.Request) {
-	// calculate timestamp immediately to mitigate TOCTOU attacks
 	now := c.getTime()
 
 	if c.hasTimeoutExpired() {
@@ -168,9 +158,6 @@ func (c Config) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c Config) ProcessHeartbeat(w http.ResponseWriter, r *http.Request) {
-	// calculate timestamp immediately to mitigate TOCTOU attacks
-	now := c.getTime()
-
 	if c.hasTimeoutExpired() {
 		http.Error(w, "TC not enrolled in the network", http.StatusForbidden)
         return
@@ -214,9 +201,15 @@ func (c Config) ProcessHeartbeat(w http.ResponseWriter, r *http.Request) {
         return
 	}
 
-	// update timeout and epoch
-	state.TOut = now + c.T_R
-	state.Epoch = iat
+	// update timestamp
+	if iat > state.Timestamp {
+		state.Timestamp = iat
+	}
+
+	// update timeout
+	if iat + c.T_V > state.TOut {
+		state.TOut = iat + c.T_V
+	}
 
 	log.Info(fmt.Sprintf("HEARTBEAT"))
 
@@ -282,14 +275,12 @@ func (c Config) ProcessHeartbeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c Config) SignMessage(w http.ResponseWriter, r *http.Request) {
-	// calculate timestamp immediately to mitigate TOCTOU attacks
-	now := c.getTime()
-
 	if c.hasTimeoutExpired() {
 		http.Error(w, "TC not enrolled in the network", http.StatusForbidden)
         return
 	}
 
+	now := c.getTime()
 	var token = jwt.New()
 
 	if err := json.NewDecoder(r.Body).Decode(&token); err != nil {
@@ -371,67 +362,49 @@ func (c Config) VerifyMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c Config) getTime() int64 {
-	if c.UseEpochs && state != nil {
-		return state.Epoch
+	if c.TrustedTime {
+		return time.Now().Unix()
 	}
 
-	return time.Now().Unix()
+	if state == nil {
+		return 0 // unknown time
+	}
+
+	return state.Timestamp
 }
 
 func (c Config) isHeartbeatFresh(iat int64) (bool, error) {
-	if c.UseEpochs {
-		// epoch "too old" -> discard
-		if iat < state.Epoch {
-			return true, errors.New("Invalid epoch")
-		}
-		// epoch "too new" -> discard & auto-revoke
-		if iat > state.Epoch + c.E_TOL + 1 {
-			return false, errors.New("Auto-revocation triggered")
-		}
+	now := c.getTime()
 
-		// all good
-		return true, nil
-	} else {
-		now := c.getTime()
-
-		// timestamp "too old" or "too new" -> discard
-		if iat < now - c.T_V || iat > now {
-			return true, errors.New("Invalid timestamp")
-		}
-
-		// all good
-		return true, nil
+	// timestamp "too old" -> discard
+	if iat < now - c.T_V {
+		return true, errors.New("Invalid timestamp")
 	}
+
+	// timestamp "too new" -> discard & revoke
+	if iat > now + c.T_V {
+		return false, errors.New("Autonomous revocation triggered")
+	}
+
+	// all good
+	return true, nil
 }
 
 func (c Config) isV2VMessageFresh(iat int64) (bool, error) {
-	if c.UseEpochs {
-		// epoch "too old" -> discard
-		if iat < state.Epoch - c.E_TOL {
-			return true, errors.New("Invalid epoch")
-		}
-		// epoch "too new" -> discard. Bonus: auto-revoke
-		if iat > state.Epoch + c.E_TOL + 1 {
-			return false, errors.New("Auto-revocation triggered")
-		}
-		if iat > state.Epoch + c.E_TOL {
-			return true, errors.New("Invalid epoch")
-		}
+	now := c.getTime()
 
-
-		// all good
-		return true, nil
-	} else {
-		now := c.getTime()
-
-		// timestamp "too old" or "too new" -> discard
-		if iat < now - c.T_V || iat > now {
-			return true, errors.New("Invalid timestamp")
-		}
-
-		// all good
-		return true, nil
+	// timestamp "too old" -> discard
+	if iat < now - c.T_V {
+		return true, errors.New("Invalid timestamp")
 	}
+
+	// timestamp "too new" -> discard & revoke
+	if iat > now + c.T_V {
+		return false, errors.New("Autonomous revocation triggered")
+	}
+
+	// all good
+	return true, nil
 }
 
 func (c Config) hasTimeoutExpired() bool {
@@ -440,7 +413,7 @@ func (c Config) hasTimeoutExpired() bool {
 		return true
 	}
 
-	if !c.UseEpochs && c.getTime() >= state.TOut {
+	if c.getTime() > state.TOut {
 		// timeout expired
 		autoRevoke()
 		return true

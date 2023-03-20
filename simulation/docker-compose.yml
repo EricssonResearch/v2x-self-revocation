@@ -3,34 +3,26 @@ services:
     image: selfrevocation/e2e-sim-issuer:${VERSION}
     build: src/issuer
     expose:
-      - "80:80"
+      - 80
     volumes:
       - "./cred/ra_public.pem:/etc/credentials/ra_public.pem"
       - "./logs:/logs"
     environment:
       - HOSTNAME=issuer
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - PSEUDONYM_SIZE=${PSEUDONYM_SIZE}
+    env_file:
+      - .env
   ra:
     image: selfrevocation/e2e-sim-ra:${VERSION}
     build: src/ra
     expose:
-      - "80:80"
+      - 80
     volumes:
       - "./cred/ra_private.pem:/etc/credentials/ra_private.pem"
       - "./logs:/logs"
     environment:
       - HOSTNAME=ra
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - USE_EPOCHS=${USE_EPOCHS}
-      - HEARTBEAT_GENERATION_PERIOD=${HEARTBEAT_GENERATION_PERIOD}
-      - TC_STORE_LAST_PRL=${TC_STORE_LAST_PRL}
-      - T_R=${T_R}
-      - T_V=${T_V}
-      - T_E=${T_E}
-      - E_TOL=${E_TOL}
+    env_file:
+      - .env
   rsu:
     image: selfrevocation/e2e-sim-rsu:${VERSION}
     build: src/rsu
@@ -38,12 +30,8 @@ services:
       - "./logs:/logs"
     environment:
       - HOSTNAME=rsu
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - HEARTBEAT_DISTRIBUTION_PERIOD=${HEARTBEAT_DISTRIBUTION_PERIOD}
-      - RSU_DROP_RATE=${RSU_DROP_RATE}
-      - RSU_DELAY_RATE=${RSU_DELAY_RATE}
-      - T_V=${T_V}
+    env_file:
+      - .env
     depends_on:
       - issuer
       - ra
@@ -52,25 +40,13 @@ services:
     build: src/vehicle/obu
     volumes:
       - "./logs:/logs"
+    env_file:
+      - .env
     environment:
       - HOSTNAME=vehicle-1
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - USE_EPOCHS=${USE_EPOCHS}
       - TC_HOST=tc-1
-      - PSEUDONYM_REFRESH_PERIOD=${PSEUDONYM_REFRESH_PERIOD}
-      - V2V_GENERATION_PERIOD=${V2V_GENERATION_PERIOD}
-      - HEARTBEAT_DISTRIBUTION_PERIOD=${HEARTBEAT_DISTRIBUTION_PERIOD}
-      - NUM_PSEUDONYMS=${NUM_PSEUDONYMS}
       - VEHICLE_MALICIOUS=0
-      - T_V=${T_V}
-      - T_R=${T_R}
-      - T_E=${T_E}
-      - E_TOL=${E_TOL}
-      - JOIN_MAX_DELAY=${JOIN_MAX_DELAY}
-      - NUM_GROUPS=${NUM_GROUPS}
-      - BLIND_ATTACKER_DROP_RATE=${BLIND_ATTACKER_DROP_RATE}
-      - BLIND_2_ATTACKER_DELAYED=${BLIND_2_ATTACKER_DELAYED}
+      - ATTACKER_LEVEL=honest
     depends_on:
       - issuer
       - ra
@@ -82,24 +58,10 @@ services:
       - "./logs:/logs"
     environment:
       - HOSTNAME=vehicle-2
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - USE_EPOCHS=${USE_EPOCHS}
       - TC_HOST=tc-2
-      - PSEUDONYM_REFRESH_PERIOD=${PSEUDONYM_REFRESH_PERIOD}
-      - V2V_GENERATION_PERIOD=${V2V_GENERATION_PERIOD}
-      - HEARTBEAT_DISTRIBUTION_PERIOD=${HEARTBEAT_DISTRIBUTION_PERIOD}
-      - NUM_PSEUDONYMS=${NUM_PSEUDONYMS}
-      - ATTACKER_LEVEL=${ATTACKER_LEVEL}
       - VEHICLE_MALICIOUS=1
-      - T_V=${T_V}
-      - T_R=${T_R}
-      - T_E=${T_E}
-      - E_TOL=${E_TOL}
-      - JOIN_MAX_DELAY=${JOIN_MAX_DELAY}
-      - NUM_GROUPS=${NUM_GROUPS}
-      - BLIND_ATTACKER_DROP_RATE=${BLIND_ATTACKER_DROP_RATE}
-      - BLIND_2_ATTACKER_DELAYED=${BLIND_2_ATTACKER_DELAYED}
+    env_file:
+      - .env
     depends_on:
       - issuer
       - ra
@@ -111,18 +73,8 @@ services:
       - "./logs:/logs"
     environment:
       - HOSTNAME=vehicle-1
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - USE_EPOCHS=${USE_EPOCHS}
-      - NUM_PSEUDONYMS=${NUM_PSEUDONYMS}
-      - PSEUDONYM_SIZE=${PSEUDONYM_SIZE}
-      - MIN_PSEUDONYM_LIFETIME=${MIN_PSEUDONYM_LIFETIME}
-      - HARD_REVOCATION=${HARD_REVOCATION}
-      - TC_STORE_LAST_PRL=${TC_STORE_LAST_PRL}
-      - T_R=${T_R}
-      - T_V=${T_V}
-      - T_E=${T_E}
-      - E_TOL=${E_TOL}
+    env_file:
+      - .env
     depends_on:
       - issuer
       - ra
@@ -133,18 +85,8 @@ services:
       - "./logs:/logs"
     environment:
       - HOSTNAME=vehicle-2
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - USE_EPOCHS=${USE_EPOCHS}
-      - NUM_PSEUDONYMS=${NUM_PSEUDONYMS}
-      - PSEUDONYM_SIZE=${PSEUDONYM_SIZE}
-      - MIN_PSEUDONYM_LIFETIME=${MIN_PSEUDONYM_LIFETIME}
-      - HARD_REVOCATION=${HARD_REVOCATION}
-      - TC_STORE_LAST_PRL=${TC_STORE_LAST_PRL}
-      - T_R=${T_R}
-      - T_V=${T_V}
-      - T_E=${T_E}
-      - E_TOL=${E_TOL}
+    env_file:
+      - .env
     depends_on:
       - issuer
       - ra
@@ -155,16 +97,19 @@ services:
       - "./logs:/logs"
     environment:
       - HOSTNAME=reporter
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_TO_FILE=${LOG_TO_FILE}
-      - USE_EPOCHS=${USE_EPOCHS}
-      - REPORT_MALICIOUS_ONLY=${REPORT_MALICIOUS_ONLY}
-      - REPORT_PERIOD=${REPORT_PERIOD}
-      - REPLAY_RATE=${REPLAY_RATE}
-      - NUM_GROUPS=${NUM_GROUPS}
-      - T_V=${T_V}
-      - T_E=${T_E}
-      - E_TOL=${E_TOL}
+    env_file:
+      - .env
+  web:
+    image: selfrevocation/e2e-sim-web:${VERSION}
+    build: src/web
+    volumes:
+      - "./logs:/logs"
+    environment:
+      - HOSTNAME=web
+    env_file:
+      - .env
+    ports:
+      - "8080:80"
   admin:
     image: yauritux/busybox-curl
     command: sleep 360000

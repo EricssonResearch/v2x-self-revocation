@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: v2x
+spec:
+  selector:
+    matchLabels:
+      run: web
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: v2x
+        run: web
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        workerNode: "yes"
+      containers:
+      - name: web
+        image: selfrevocation/e2e-sim-web:{VERSION}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80 
+        envFrom:
+          - configMapRef:
+              name: system
+        volumeMounts:
+        - mountPath: /logs
+          name: nfs
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: nfs
+        hostPath:
+          path: /mnt/nfs-disk-2/v2x
+---
+apiVersion: v1
+kind: Service
+metadata: 
+  name: web
+  namespace: v2x
+spec:
+  ports: 
+    - name: http
+      port: 80 
+      targetPort: 80 
+      protocol: TCP
+  selector:
+    run: web

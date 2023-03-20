@@ -27,7 +27,7 @@ class PRL():
 
     def remove_old_pseudonyms(self):
         now = freshness.get_freshness_parameter()
-        self.prl = list(filter(lambda x : x.expiration > now, self.prl))
+        self.prl = list(filter(lambda x : now <= x.expiration, self.prl))
 
     def get_heartbeat(self):
         if self.__heartbeat is None:

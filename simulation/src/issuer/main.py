@@ -23,13 +23,11 @@ async def join():
     logging.debug(f"Generated new long-term ID: {id}")
 
     try:
-        fre = await utils.get_freshness_parameter()
-
         data = {
             "ltp" : id,
             "keyRA" : ra_key,
             "groupKey": group_key,
-            "epoch" : fre 
+            "timestamp" : utils.get_freshness_parameter() 
         }
 
         return crypto.encrypt(pubkey, json.dumps(data))

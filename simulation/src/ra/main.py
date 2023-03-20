@@ -23,17 +23,6 @@ async def prl_cleaner():
     except asyncio.CancelledError:
         pass
 
-async def epoch_manager():
-    try:
-        if not conf.env("USE_EPOCHS"):
-            return
-        
-        while True:
-            await asyncio.sleep(conf.env("T_E"))
-            logging.info(f"EPOCH {freshness.advance_epoch()}")
-    except asyncio.CancelledError:
-        pass
-
 async def heartbeat_generator():
     try:
         while True:
@@ -62,19 +51,12 @@ async def report(id):
     # TODO report a pseudonym
     return f"{id} reported.\n"
 
-@app.route("/freshness")
-async def get_freshness_parameter():
-    fre = freshness.get_freshness_parameter()
-    logging.debug(f"Sending freshness parameter {fre}")
-    return str(fre)
-
 @app.before_serving
 async def startup():
     asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, shutdown)
     asyncio.get_running_loop().add_signal_handler(signal.SIGINT, shutdown)
 
     tasks.append(asyncio.create_task(prl_cleaner()))
-    tasks.append(asyncio.create_task(epoch_manager()))
     tasks.append(asyncio.create_task(heartbeat_generator()))
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import asyncio_dgram
 import logging
 import aiohttp
 import gc
@@ -11,8 +12,10 @@ from attacker import Attacker
 from broadcast import Broadcast
 from credentials import CredentialManager
 
+group = utils.get_random_int(1, conf.env("NUM_GROUPS"))
 broadcast_heartbeat = Broadcast(conf.env("HEARTBEAT_PORT"))
-broadcast_v2v = Broadcast(conf.env("V2V_PORT"), random_group=True)
+broadcast_v2v = Broadcast(conf.env("V2V_PORT") + group, random_group=False)
+broadcast_log = Broadcast(conf.env("LOG_PORT") + group, random_group=False)
 cred_manager = CredentialManager()
 q = asyncio.Queue()
 
@@ -20,6 +23,32 @@ async def exit_checker():
     await q.get()
     logging.debug("TC is revoked.")
 
+
+async def movement_manager():
+    global group
+    random_movement = conf.env("RANDOM_MOVEMENT")
+    num_groups = conf.env("NUM_GROUPS")
+
+    try:
+        while True:
+            try:
+                wait_time = utils.get_random_int(1, conf.env("MOVEMENT_PERIOD"))
+                await asyncio.sleep(wait_time)
+
+                if random_movement:
+                    group = utils.get_random_int(1, num_groups)
+                else:
+                    group = 1 if group >= num_groups else group + 1
+
+                logging.debug(f"Moving to group {group}")
+                broadcast_v2v.close()
+                broadcast_log.close()
+                await broadcast_v2v.update_port(conf.env("V2V_PORT") + group)
+                await broadcast_log.update_port(conf.env("LOG_PORT") + group)
+            except Exception as e:
+                logging.error(f"movement_manager: {e}")
+    except asyncio.CancelledError:
+        pass
 
 async def heartbeat_receiver(tc_session):
     try:
@@ -41,20 +70,32 @@ async def v2v_receiver(tc_session):
             try:
                 data = await broadcast_v2v.recv()
                 decoded_data = utils.decode_jwt(data)
+                ps = decoded_data["payload"]["iss"]
+                malicious = decoded_data["payload"]["malicious"]
 
-                if decoded_data["payload"]["iss"] in cred_manager.get_pseudonyms():
+                if ps in cred_manager.get_pseudonyms():
                     # this is our own message, skip
                     continue
 
                 async with tc_session.post("/verify", data=data) as response:
+                    # check if TC is still operational
                     if response.status == 403:
                         q.put_nowait(True)
-                    elif response.status != 200:
+                    # log if request has failed
+                    if response.status != 200:
                         logging.debug(
                             f"TC/verify failed: {response.status} {await response.text()}".strip()
                         )
+                    # log to UDP otherwise
+                    else:
+                        if malicious and conf.env("LOG_TO_UDP"):
+                            own_ps = ' '.join(cred_manager.get_pseudonyms())
+                            await broadcast_log.send(f"VERIFY {ps} {own_ps}".encode())
+            except asyncio_dgram.aio.TransportClosed:
+                # we are changing group, wait until the new is initialized
+                await asyncio.sleep(0.1)
             except Exception as e:
-                logging.error(f"v2v_receiver: {e}")
+                logging.error(f"v2v_receiver: {e.__class__} {e}")
 
     except asyncio.CancelledError:
         pass
@@ -82,18 +123,22 @@ async def message_generator(tc_session):
             # sending to TC for signature
             try:
                 async with tc_session.post("/sign", json=msg) as response:
+                    # remove pseudonym if unusable
                     if response.status == 401:
-                        logging.debug(f"Pseudonym {ps} not usable anymore.")
                         cred_manager.remove_pseudonym(ps)
+                    # check if TC is still operational
                     elif response.status == 403:
                         q.put_nowait(True)
-                    elif response.status != 200:
-                        logging.debug(f"Sign error: {response.status} {await response.text()}".strip())
+                    # log if request has failed
+                    if response.status != 200:
+                        logging.debug(f"TC/sign failed: {response.status} {await response.text()}".strip())
+                    # log to UDP otherwise
                     else:
                         signed_msg = await response.read()
                         #logging.debug(f"Message signed: {signed_msg}")
                         await broadcast_v2v.send(signed_msg)
-                
+                        if conf.env("LOG_TO_UDP"):
+                            await broadcast_log.send(f"SIGN {ps} {int(malicious)}".encode())
             except Exception as e:
                 logging.error(f"message_generator: {e}")
     except asyncio.CancelledError:
@@ -107,10 +152,13 @@ async def pseudonym_refresher(tc_session):
             for _ in range(num_pseudonyms):
                 try:
                     async with tc_session.get("/create") as response:
+                        # check if TC is still operational
                         if response.status == 403:
                             q.put_nowait(True)
-                        elif response.status != 200:
-                            logging.debug(f"Create error: {response.status} {await response.text()}".strip())
+                        # log if request has failed
+                        if response.status != 200:
+                            logging.debug(f"TC/create failed: {response.status} {await response.text()}".strip())
+                        # add new pseudonym to list otherwise
                         else:
                             ps = await response.text()
                             #logging.debug(f"New pseudonym: {ps}")
@@ -183,13 +231,17 @@ async def main():
 
                 await broadcast_v2v.initialize()
                 await broadcast_heartbeat.initialize()
+                await broadcast_log.initialize()
 
                 tasks = [
                     asyncio.create_task(heartbeat_receiver(session)),
                     asyncio.create_task(v2v_receiver(session)),
                     asyncio.create_task(message_generator(session)),
-                    asyncio.create_task(pseudonym_refresher(session))
+                    asyncio.create_task(pseudonym_refresher(session)),
                 ]
+
+                if conf.env("VEHICLE_MOVING"):
+                    tasks.append(asyncio.create_task(movement_manager()))
 
                 await exit_checker()
                 for task in tasks:
@@ -197,11 +249,16 @@ async def main():
 
                 broadcast_v2v.close()
                 broadcast_heartbeat.close()
+                broadcast_log.close()
                 # clean memory
                 gc.collect()
+
+                if not conf.env("AUTO_REJOIN"):
+                    await asyncio.sleep(999999999999)
     except asyncio.CancelledError:
         broadcast_v2v.close()
         broadcast_heartbeat.close()
+        broadcast_log.close()
 
 
 def shutdown():

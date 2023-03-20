@@ -11,15 +11,18 @@ def parse_environment_vars():
     env.read_env()
 
     vars["HOSTNAME"]                    = env.str("HOSTNAME")
-    vars["REPORT_MALICIOUS_ONLY"]       = env.bool("REPORT_MALICIOUS_ONLY")
-    vars["REPORT_PERIOD"]               = env.float("REPORT_PERIOD") 
-    vars["REPLAY_RATE"]                 = env.float("REPLAY_RATE")
     vars["LOG_LEVEL"]                   = env.str("LOG_LEVEL", default="info")
     vars["LOG_TO_FILE"]                 = env.bool("LOG_TO_FILE")
     vars["LOG_MAX_SIZE"]                = env.int("LOG_MAX_SIZE")
-    vars["V2V_PORT"]                    = env.int("V2V_PORT", default=9000)
+    vars["LOG_PORT"]                    = env.int("LOG_PORT", default=7000)
+    vars["HEARTBEAT_PORT"]              = env.int("HEARTBEAT_PORT", default=8000)
     vars["NUM_GROUPS"]                  = env.int("NUM_GROUPS", default=1)
+    vars["THRESHOLD_MALICIOUS"]         = env.int("THRESHOLD_MALICIOUS")
+    vars["THRESHOLD_UNSEEN"]            = env.int("THRESHOLD_UNSEEN")
+    vars["THRESHOLD_UNUSED"]            = env.int("THRESHOLD_UNUSED")
     vars["T_V"]                         = env.int("T_V")
+
+    vars["T_EFF"]                       = vars["T_V"] + vars["T_V"]
 
     vars["LOG_FILE_NAME"]               = f"/logs/{vars['HOSTNAME']}.log"
 

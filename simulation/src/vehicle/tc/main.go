@@ -14,6 +14,7 @@ import (
 
 	"github.com/caarlos0/env/v6"
 	log "github.com/sirupsen/logrus"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
 var cfg handlers.Config
@@ -33,19 +34,32 @@ func init() {
 		if err != nil && !os.IsExist(err) {
 			log.Fatal(err)
 		}
+		
+		if cfg.LogMaxSize > 0 {
+			lumberjackLogger := &lumberjack.Logger{
+				Filename:   fmt.Sprintf("/logs/%v-tc.log", cfg.Host),
+				MaxSize:    cfg.LogMaxSize, // MB
+				MaxBackups: 1,
+				MaxAge:     360,   // days
+				Compress:   false,
+			}
 
-		f, err := os.OpenFile(
-			fmt.Sprintf("/logs/%v-tc.log", cfg.Host),
-			os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-			0644,
-		)
+			mw := io.MultiWriter(os.Stdout, lumberjackLogger)
+			log.SetOutput(mw)
+		} else {
+			f, err := os.OpenFile(
+				fmt.Sprintf("/logs/%v-tc.log", cfg.Host),
+				os.O_WRONLY | os.O_CREATE | os.O_APPEND,
+				0644,
+			)
+	
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		if err != nil {
-			log.Fatal(err)
+			mw := io.MultiWriter(os.Stdout, f)
+			log.SetOutput(mw)
 		}
-
-		mw := io.MultiWriter(os.Stdout, f)
-		log.SetOutput(mw)
 	}
 }
 
