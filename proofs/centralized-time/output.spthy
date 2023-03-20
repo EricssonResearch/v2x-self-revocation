@@ -1,0 +1,2851 @@
+theory RevocationCentralizedTime begin
+
+// Function signature and definition of the equational theory E
+
+builtins: multiset
+functions: fst/1, pair/2, pk/1, sign/2, snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+
+
+predicate: LessThan( x, y )<=>∃ z. (x+z) = y
+
+predicate: GreaterThan( x, y )<=>∃ z. x = (y+z)
+
+predicate: GreaterEqualThan( x, y )<=>(x = y) ∨ (∃ z. x = (y+z))
+
+predicate: IsNotInList( x, y )<=>(((¬(x = y)) ∧ (¬(∃ a. (a+x) = y))) ∧ (¬(∃ b. (b+x) = y))) ∧
+(¬(∃ c d. (c+d+x) = y))
+
+predicate: IsInList( x, y )<=>(((x = y) ∨ (∃ a. (a+x) = y)) ∨ (∃ b. (b+x) = y)) ∨
+(∃ c d. (c+d+x) = y)
+
+restriction Equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction OnlyOnce:
+  "∀ x #i #j. ((OnlyOnce( x ) @ #i) ∧ (OnlyOnce( x ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction GreaterEqualThan:
+  "∀ x y #i.
+    (GreaterEqualThan( x, y ) @ #i) ⇒ ((x = y) ∨ (∃ z. x = (y+z)))"
+
+restriction IsInList:
+  "∀ x y #i.
+    (IsInList( x, y ) @ #i) ⇒
+    ((((x = y) ∨ (∃ a. (a+x) = y)) ∨ (∃ b. (b+x) = y)) ∨
+     (∃ c d. (c+d+x) = y))"
+
+restriction IsNotInList:
+  "∀ x y #i.
+    (IsNotInList( x, y ) @ #i) ⇒
+    ((((¬(x = y)) ∧ (¬(∃ a. (a+x) = y))) ∧ (¬(∃ b. (b+x) = y))) ∧
+     (¬(∃ c d. (c+d+x) = y)))"
+  // safety formula
+
+restriction IsNotRevoked:
+  "∀ #i.
+    (IsNotRevoked( ) @ #i) ⇒ (¬(∃ t #j. (Revoked( t ) @ #j) ∧ (#j < #i)))"
+  // safety formula
+
+restriction IsLatestTime:
+  "∀ x t #i.
+    (IsLatestTime( x, t ) @ #i) ⇒
+    (¬(∃ t2 #j. ((NewTime( x, t2 ) @ #j) ∧ (#j < #i)) ∧ (∃ z. t2 = (t+z))))"
+  // safety formula
+
+restriction IsLatestPRL:
+  "∀ cnt #i.
+    (IsLatestPRL( cnt ) @ #i) ⇒
+    (¬(∃ prl cnt2 #j.
+        ((PRLUpdated( prl, cnt2 ) @ #j) ∧ (#j < #i)) ∧ (∃ z. cnt2 = (cnt+z))))"
+  // safety formula
+
+rule (modulo E) init_parameters:
+   [ ] --[ OnlyOnce( 'init_parameters' ) ]-> [ TvTmp( '1' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) increment_Tv:
+   [ TvTmp( tv ) ] --> [ TvTmp( ('1'+tv) ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init:
+   [ Fr( ~ps_key ), Fr( ~ltk ), TvTmp( tv ) ]
+  --[
+  OnlyOnce( 'Init' ), SystemInitialized( tv ), NewTime( 'TC', '1' ),
+  NewTime( 'RA', '1' ), PRLUpdated( '0', '1' )
+  ]->
+   [
+   !Time( 'TC', '1' ), !Time( 'RA', '1' ), !Parameters( tv ),
+   !Pseudonym( pk(~ps_key) ), !Ltk( pk(~ps_key), ~ps_key ),
+   !Ltk( 'RA', ~ltk ), !Pk( 'RA', pk(~ltk) ), !PRL( '0', '1' ),
+   Out( pk(~ltk) ), Out( pk(~ps_key) )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) process_message:
+   [
+   In( <<m, t_v2v>, signature> ), !Parameters( tv ), !Pseudonym( ps ),
+   !Time( 'RA', t )
+   ]
+  --[
+  Eq( verify(signature, <m, t_v2v>, ps), true ),
+  GreaterEqualThan( (t_v2v+tv), t ), MessageAccepted( <m, t_v2v>, ps, t )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) process_message:
+     [
+     In( <<m, t_v2v>, signature> ), !Parameters( tv ), !Pseudonym( ps ),
+     !Time( 'RA', t )
+     ]
+    --[
+    Eq( z, true ), GreaterEqualThan( (t_v2v+tv), t ),
+    MessageAccepted( <m, t_v2v>, ps, t )
+    ]->
+     [ ]
+    variants (modulo AC)
+    1. m     = m.10
+       ps    = ps.11
+       signature
+             = signature.12
+       t_v2v = t_v2v.14
+       z     = verify(signature.12, <m.10, t_v2v.14>, ps.11)
+    
+    2. m     = m.12
+       ps    = pk(x.21)
+       signature
+             = sign(<m.12, t_v2v.16>, x.21)
+       t_v2v = t_v2v.16
+       z     = true
+  */
+
+rule (modulo E) TC_sign_message:
+   [ !Time( 'TC', t ), !Pseudonym( ps ), !Ltk( ps, ps_key ), Fr( ~m ) ]
+  --[ IsNotRevoked( ), IsLatestTime( 'TC', t ), Signed( <~m, t>, ps ) ]->
+   [ Out( <<~m, t>, sign(<~m, t>, ps_key)> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) TC_process_heartbeat_no_revoke:
+   [
+   !Time( 'TC', t ), !Parameters( tv ), !Pseudonym( ps ), !Pk( 'RA', pkRA ),
+   In( <<prl, t_hb>, signature> )
+   ]
+  --[
+  IsNotRevoked( ), IsLatestTime( 'TC', t ),
+  Eq( verify(signature, <prl, t_hb>, pkRA), true ),
+  GreaterEqualThan( (t_hb+tv), t ), GreaterEqualThan( (t+tv), t_hb ),
+  IsNotInList( ps, prl ), HeartbeatProcessed( <prl, t_hb> ),
+  NewTime( 'TC', t_hb )
+  ]->
+   [ !Time( 'TC', t_hb ) ]
+
+  // loop breaker: [0]
+  /*
+  rule (modulo AC) TC_process_heartbeat_no_revoke:
+     [
+     !Time( 'TC', t ), !Parameters( tv ), !Pseudonym( ps ), !Pk( 'RA', pkRA ),
+     In( <<prl, t_hb>, signature> )
+     ]
+    --[
+    IsNotRevoked( ), IsLatestTime( 'TC', t ), Eq( z, true ),
+    GreaterEqualThan( (t_hb+tv), t ), GreaterEqualThan( (t+tv), t_hb ),
+    IsNotInList( ps, prl ), HeartbeatProcessed( <prl, t_hb> ),
+    NewTime( 'TC', t_hb )
+    ]->
+     [ !Time( 'TC', t_hb ) ]
+    variants (modulo AC)
+    1. pkRA  = pkRA.17
+       prl   = prl.18
+       signature
+             = signature.20
+       t_hb  = t_hb.22
+       z     = verify(signature.20, <prl.18, t_hb.22>, pkRA.17)
+    
+    2. pkRA  = pk(x.39)
+       prl   = prl.21
+       signature
+             = sign(<prl.21, t_hb.25>, x.39)
+       t_hb  = t_hb.25
+       z     = true
+    // loop breaker: [0]
+  */
+
+rule (modulo E) TC_process_heartbeat_revoke:
+   [
+   !Time( 'TC', t ), !Parameters( tv ), !Pseudonym( ps ), !Pk( 'RA', pkRA ),
+   In( <<prl, t_hb>, signature> )
+   ]
+  --[
+  IsNotRevoked( ), IsLatestTime( 'TC', t ),
+  Eq( verify(signature, <prl, t_hb>, pkRA), true ),
+  GreaterEqualThan( (t_hb+tv), t ), GreaterEqualThan( (t+tv), t_hb ),
+  IsInList( ps, prl ), HeartbeatProcessed( <prl, t_hb> ),
+  NewTime( 'TC', t_hb ), Revoked( t )
+  ]->
+   [ !Time( 'TC', t_hb ) ]
+
+  // loop breaker: [0]
+  /*
+  rule (modulo AC) TC_process_heartbeat_revoke:
+     [
+     !Time( 'TC', t ), !Parameters( tv ), !Pseudonym( ps ), !Pk( 'RA', pkRA ),
+     In( <<prl, t_hb>, signature> )
+     ]
+    --[
+    IsNotRevoked( ), IsLatestTime( 'TC', t ), Eq( z, true ),
+    GreaterEqualThan( (t_hb+tv), t ), GreaterEqualThan( (t+tv), t_hb ),
+    IsInList( ps, prl ), HeartbeatProcessed( <prl, t_hb> ),
+    NewTime( 'TC', t_hb ), Revoked( t )
+    ]->
+     [ !Time( 'TC', t_hb ) ]
+    variants (modulo AC)
+    1. pkRA  = pkRA.17
+       prl   = prl.18
+       signature
+             = signature.20
+       t_hb  = t_hb.22
+       z     = verify(signature.20, <prl.18, t_hb.22>, pkRA.17)
+    
+    2. pkRA  = pk(x.39)
+       prl   = prl.21
+       signature
+             = sign(<prl.21, t_hb.25>, x.39)
+       t_hb  = t_hb.25
+       z     = true
+    // loop breaker: [0]
+  */
+
+rule (modulo E) RA_generate_heartbeat:
+   [ !Time( 'RA', t ), !PRL( prl, cnt ), !Ltk( 'RA', ltk ) ]
+  --[
+  IsLatestPRL( cnt ), IsLatestTime( 'RA', t ),
+  OnlyOnce( <'generate_hb', prl, t> ), HeartbeatGenerated( <prl, t> )
+  ]->
+   [ Out( <<prl, t>, sign(<prl, t>, ltk)> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) RA_issue_revocation:
+   [ !Time( 'RA', t ), !Pseudonym( ps ), !PRL( prl, cnt ) ]
+  --[
+  IsLatestPRL( cnt ), IsLatestTime( 'RA', t ),
+  OnlyOnce( <'issue_revocation', ps> ), RevocationIssued( ps, t ),
+  PRLUpdated( (prl+ps), ('1'+cnt) )
+  ]->
+   [ !PRL( (prl+ps), ('1'+cnt) ) ]
+
+  // loop breaker: [2]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) RA_advance_time:
+   [ !Time( 'RA', t ) ]
+  --[ OnlyOnce( <'advance_time', t> ), NewTime( 'RA', ('1'+t) ) ]->
+   [ !Time( 'RA', ('1'+t) ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+lemma sign_possible [heuristic=I]:
+  exists-trace "∃ msg ps #i. Signed( msg, ps ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ msg ps #i. (Signed( msg, ps ) @ #i)"
+*/
+simplify
+solve( !Time( 'TC', t ) ▶₀ #i )
+  case Init_case_1
+  solve( !Pseudonym( ps ) ▶₁ #i )
+    case Init
+    solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₂ #i )
+      case Init
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma generate_hb_possible [heuristic=I]:
+  exists-trace "∃ hb #i. HeartbeatGenerated( hb ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ hb #i. (HeartbeatGenerated( hb ) @ #i)"
+*/
+simplify
+solve( !Time( 'RA', t ) ▶₀ #i )
+  case Init_case_1
+  solve( !PRL( prl, cnt ) ▶₁ #i )
+    case Init
+    solve( !Ltk( 'RA', ltk ) ▶₂ #i )
+      case Init
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma issue_revocation_possible [heuristic=I]:
+  exists-trace "∃ ps t #i. RevocationIssued( ps, t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ ps t #i. (RevocationIssued( ps, t ) @ #i)"
+*/
+simplify
+solve( !Time( 'RA', t ) ▶₀ #i )
+  case Init_case_1
+  solve( !Pseudonym( ps ) ▶₁ #i )
+    case Init
+    solve( !PRL( prl, cnt ) ▶₂ #i )
+      case Init
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma processing_hb_possible [heuristic=o "oracle.py"]:
+  exists-trace "∃ hb #i. HeartbeatProcessed( hb ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ hb #i. (HeartbeatProcessed( hb ) @ #i)"
+*/
+simplify
+solve( HeartbeatProcessed( hb ) @ #i )
+  case TC_process_heartbeat_no_revoke
+  solve( !Pseudonym( ps ) ▶₂ #i )
+    case Init_case_1
+    solve( !Pk( 'RA', pk(x) ) ▶₃ #i )
+      case Init
+      solve( !Parameters( tv ) ▶₁ #i )
+        case Init
+        solve( !KU( sign(<prl, t_hb>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( (('1'+'1') = t)  ∥ (∃ z. (('1'+'1') = (t+z))) )
+            case case_1
+            solve( !Time( 'TC', ('1'+'1') ) ▶₀ #i )
+              case TC_process_heartbeat_no_revoke
+              solve( !KU( sign(<prl, ('1'+'1')>, ~ltk) ) @ #vk.9 )
+                case RA_generate_heartbeat_case_1
+                solve( (('1'+t) = ('1'+'1'))  ∥ (∃ z. (('1'+t) = ('1'+'1'+z))) )
+                  case case_1
+                  solve( (¬(#vr.7 < #vr.2))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    solve( !Time( 'TC', '1' ) ▶₀ #vr.4 )
+                      case Init
+                      solve( !Time( 'RA', '1' ) ▶₀ #vr.7 )
+                        case Init
+                        SOLVED // trace found
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma revocation_possible [heuristic=o "oracle.py"]:
+  exists-trace "∃ t #i. Revoked( t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ t #i. (Revoked( t ) @ #i)"
+*/
+simplify
+solve( !Pseudonym( ps ) ▶₂ #i )
+  case Init_case_1
+  solve( !Pk( 'RA', pk(x) ) ▶₃ #i )
+    case Init
+    solve( !Parameters( tv ) ▶₁ #i )
+      case Init
+      solve( !KU( sign(<prl, t_hb>, ~ltk) ) @ #vk.4 )
+        case RA_generate_heartbeat_case_2
+        solve( !PRL( prl, cnt ) ▶₂ #vr.4 )
+          case Init
+          solve( !KU( pk(~ps_key) ) @ #vk.6 )
+            case Init
+            solve( (('1'+'1') = t)  ∥ (∃ z. (('1'+'1') = (t+z))) )
+              case case_2
+              solve( !Time( 'TC', '1' ) ▶₀ #i )
+                case Init
+                solve( (∃ a. ((a+pk(~ps_key)) = ('0'+pk(~ps_key))))  ∥
+                       (∃ b. ((b+pk(~ps_key)) = ('0'+pk(~ps_key))))  ∥
+                       (∃ c d. ((c+d+pk(~ps_key)) = ('0'+pk(~ps_key)))) )
+                  case case_1
+                  SOLVED // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma process_message_possible [heuristic=I]:
+  exists-trace "∃ msg ps t #i. MessageAccepted( msg, ps, t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ msg ps t #i. (MessageAccepted( msg, ps, t ) @ #i)"
+*/
+simplify
+solve( !Parameters( tv ) ▶₁ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(x) ) ▶₂ #i )
+    case Init
+    solve( !Time( 'RA', t ) ▶₃ #i )
+      case Init
+      solve( !KU( sign(<m, t_v2v>, ~ps_key) ) @ #vk.4 )
+        case TC_sign_message_case_1
+        solve( !KU( ~m ) @ #vk.3 )
+          case TC_sign_message
+          SOLVED // trace found
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma exists_par_tv_5 [heuristic=I]:
+  exists-trace
+  "∃ tv #i. (SystemInitialized( tv ) @ #i) ∧ (tv = ('1'+'1'+'1'+'1'+'1'))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ tv #i. (SystemInitialized( tv ) @ #i) ∧ (tv = ('1'+'1'+'1'+'1'+'1'))"
+*/
+simplify
+solve( SystemInitialized( ('1'+'1'+'1'+'1'+'1') ) @ #i )
+  case Init
+  solve( TvTmp( ('1'+'1'+'1'+'1'+'1') ) ▶₂ #i )
+    case increment_Tv
+    solve( TvTmp( ('1'+'1'+'1'+'1') ) ▶₀ #vr )
+      case increment_Tv
+      solve( TvTmp( ('1'+'1'+'1') ) ▶₀ #vr.1 )
+        case increment_Tv
+        solve( TvTmp( ('1'+'1') ) ▶₀ #vr.2 )
+          case increment_Tv
+          solve( TvTmp( '1' ) ▶₀ #vr.3 )
+            case init_parameters
+            SOLVED // trace found
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma exists_par_tv_8 [heuristic=I]:
+  exists-trace
+  "∃ tv #i.
+    (SystemInitialized( tv ) @ #i) ∧
+    (tv = ('1'+'1'+'1'+'1'+'1'+'1'+'1'+'1'))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ tv #i.
+  (SystemInitialized( tv ) @ #i) ∧
+  (tv = ('1'+'1'+'1'+'1'+'1'+'1'+'1'+'1'))"
+*/
+simplify
+solve( SystemInitialized( ('1'+'1'+'1'+'1'+'1'+'1'+'1'+'1') ) @ #i )
+  case Init
+  solve( TvTmp( ('1'+'1'+'1'+'1'+'1'+'1'+'1'+'1') ) ▶₂ #i )
+    case increment_Tv
+    solve( TvTmp( ('1'+'1'+'1'+'1'+'1'+'1'+'1') ) ▶₀ #vr )
+      case increment_Tv
+      solve( TvTmp( ('1'+'1'+'1'+'1'+'1'+'1') ) ▶₀ #vr.1 )
+        case increment_Tv
+        solve( TvTmp( ('1'+'1'+'1'+'1'+'1') ) ▶₀ #vr.2 )
+          case increment_Tv
+          solve( TvTmp( ('1'+'1'+'1'+'1') ) ▶₀ #vr.3 )
+            case increment_Tv
+            solve( TvTmp( ('1'+'1'+'1') ) ▶₀ #vr.4 )
+              case increment_Tv
+              solve( TvTmp( ('1'+'1') ) ▶₀ #vr.5 )
+                case increment_Tv
+                solve( TvTmp( '1' ) ▶₀ #vr.6 )
+                  case init_parameters
+                  SOLVED // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_signing_after_revocation [heuristic=I]:
+  all-traces
+  "∀ msg ps #i.
+    (Signed( msg, ps ) @ #i) ⇒
+    (¬(∃ t2 #j. (Revoked( t2 ) @ #j) ∧ (#j < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ msg ps #i.
+  (Signed( msg, ps ) @ #i) ∧ ∃ t2 #j. (Revoked( t2 ) @ #j) ∧ #j < #i"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma all_signatures_max_time_t_rev [heuristic=o "oracle.py"]:
+  all-traces
+  "∀ m ps t #i.
+    (Signed( <m, t>, ps ) @ #i) ⇒
+    (¬(∃ t_rev #j.
+        (RevocationIssued( ps, t_rev ) @ #j) ∧ (∃ z. t = (t_rev+z))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m ps t #i.
+  (Signed( <m, t>, ps ) @ #i)
+ ∧
+  ∃ t_rev #j. (RevocationIssued( ps, t_rev ) @ #j) ∧ ∃ z. (t = (t_rev+z))"
+*/
+simplify
+solve( !Pseudonym( ps ) ▶₁ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(~ps_key) ) ▶₁ #j )
+    case Init
+    solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₂ #i )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #j )
+        case Init
+        solve( !Time( 'TC', (t_rev+z) ) ▶₀ #i )
+          case TC_process_heartbeat_no_revoke
+          solve( !KU( sign(<prl, (t_rev+z)>, ~ltk) ) @ #vk.4 )
+            case RA_generate_heartbeat_case_01
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_02
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_03
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_04
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_05
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_06
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_07
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_08
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_09
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_10
+            by contradiction /* from formulas */
+          next
+            case c_sign
+            by solve( !KU( ~ltk ) @ #vk.7 )
+          qed
+        next
+          case TC_process_heartbeat_revoke
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  qed
+next
+  case Init_case_2
+  solve( !Pseudonym( pk(~ps_key) ) ▶₁ #j )
+    case Init
+    solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₂ #i )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #j )
+        case Init
+        solve( !Time( 'TC', (t_rev+z) ) ▶₀ #i )
+          case TC_process_heartbeat_no_revoke
+          solve( !KU( sign(<prl, (t_rev+z)>, ~ltk) ) @ #vk.4 )
+            case RA_generate_heartbeat_case_01
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_02
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_03
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_04
+            solve( (¬(#j < #vr.3))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+              case case_1
+              by contradiction /* from formulas */
+            next
+              case case_2
+              by contradiction /* from formulas */
+            qed
+          next
+            case RA_generate_heartbeat_case_05
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_06
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_07
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_08
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_09
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_10
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_11
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_12
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_13
+            by contradiction /* from formulas */
+          next
+            case c_sign
+            by solve( !KU( ~ltk ) @ #vk.7 )
+          qed
+        next
+          case TC_process_heartbeat_revoke
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma effective_revocation [heuristic=o "oracle.py"]:
+  all-traces
+  "∀ msg ps t #i.
+    (MessageAccepted( msg, ps, t ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ t_rev #k.
+          (RevocationIssued( ps, t_rev ) @ #k) ∧ (∃ z. t = (t_rev+tv+z)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ msg ps t #i.
+  (MessageAccepted( msg, ps, t ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ t_rev #k.
+      (RevocationIssued( ps, t_rev ) @ #k) ∧ ∃ z. (t = (t_rev+tv+z))))"
+*/
+simplify
+solve( !Pseudonym( pk(x) ) ▶₂ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(~ps_key) ) ▶₁ #k )
+    case Init
+    solve( !PRL( prl, cnt ) ▶₂ #k )
+      case Init
+      solve( !Parameters( tv ) ▶₁ #i )
+        case Init
+        solve( !KU( sign(<m, t_v2v>, ~ps_key) ) @ #vk.4 )
+          case TC_sign_message
+          solve( !KU( sign(<prl, t_v2v>, ~ltk) ) @ #vk.8 )
+            case RA_generate_heartbeat_case_1
+            solve( !KU( ~m ) @ #vk.4 )
+              case TC_sign_message
+              solve( (¬(#k < #vr.5))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                solve( (('1'+t.1) = ('1'+t))  ∥ (∃ z. (('1'+t.1) = ('1'+t+z))) )
+                  case case_1
+                  solve( !Time( 'RA', ('1'+t_rev+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥ (∀ z.1. (('1'+t_rev+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t) = ('1'+t_rev+z))  ∥
+                             (∃ z.1. (('1'+'1'+t) = ('1'+t_rev+z+z.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* cyclic */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  solve( !Time( 'RA', ('1'+t_rev+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥ (∀ z.1. (('1'+t_rev+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t) = ('1'+t_rev+z))  ∥
+                             (∃ z.1. (('1'+'1'+t) = ('1'+t_rev+z+z.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* cyclic */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          next
+            case RA_generate_heartbeat_case_2
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_3
+            by contradiction /* from formulas */
+          next
+            case c_sign
+            by solve( !KU( ~ltk ) @ #vk.9 )
+          qed
+        next
+          case c_sign
+          by solve( !KU( ~ps_key ) @ #vk.5 )
+        qed
+      qed
+    qed
+  qed
+next
+  case Init_case_2
+  solve( !Pseudonym( pk(~ps_key) ) ▶₁ #k )
+    case Init
+    solve( !PRL( prl, cnt ) ▶₂ #k )
+      case Init
+      solve( !Parameters( tv ) ▶₁ #i )
+        case Init
+        solve( !KU( sign(<m, t_v2v>, ~ps_key) ) @ #vk.4 )
+          case TC_sign_message
+          solve( !KU( sign(<prl, t_v2v>, ~ltk) ) @ #vk.8 )
+            case RA_generate_heartbeat_case_1
+            solve( !KU( ~m ) @ #vk.4 )
+              case TC_sign_message
+              solve( (¬(#k < #vr.5))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                solve( (('1'+tv+t.1) = ('1'+t))  ∥ (∃ z. (('1'+tv+t.1) = ('1'+t+z))) )
+                  case case_1
+                  solve( !Time( 'RA', ('1'+t_rev+tv+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.1. (('1'+t_rev+tv+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t+tv+tv) = ('1'+t_rev+tv+z))  ∥
+                             (∃ z.1. (('1'+'1'+t+tv+tv) = ('1'+t_rev+tv+z+z.1))) )
+                        case case_1_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_17
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_18
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_19
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_20
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_21
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_22
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_23
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_24
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_25
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_26
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_27
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_28
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_29
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_30
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_31
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_32
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_33
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_34
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_35
+                        by contradiction /* cyclic */
+                      next
+                        case case_2_case_36
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_37
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_38
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_39
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_40
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_41
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_42
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_43
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_44
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_45
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_46
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_47
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_48
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_49
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_50
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_51
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_52
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_53
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_54
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_55
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_56
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_57
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_58
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_59
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_60
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_61
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_62
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_63
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_64
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_65
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_66
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_67
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_68
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_69
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_70
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_71
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_72
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_73
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_74
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_75
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_76
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_77
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_78
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_79
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_80
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_81
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_82
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_83
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_84
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_85
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_86
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_87
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_88
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_89
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_90
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_91
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_92
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_93
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_94
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_95
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_96
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_1
+                  solve( !Time( 'RA', ('1'+t+t_rev+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥ (∀ z.1. (('1'+t+t_rev+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t+t) = ('1'+t+t_rev+z))  ∥
+                             (∃ z.1. (('1'+'1'+t+t) = ('1'+t+t_rev+z+z.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_2
+                  solve( !Time( 'RA', ('1'+t+t_rev+x+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.1. (('1'+t+t_rev+x+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t+t+x) = ('1'+t+t_rev+x+z))  ∥
+                             (∃ z.1. (('1'+'1'+t+t+x) = ('1'+t+t_rev+x+z+z.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_3
+                  solve( !Time( 'RA', ('1'+t_rev+tv+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.1. (('1'+t_rev+tv+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t+tv) = ('1'+t_rev+tv+z))  ∥
+                             (∃ z.1. (('1'+'1'+t+tv) = ('1'+t_rev+tv+z+z.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_4
+                  solve( !Time( 'RA', ('1'+t_rev+tv+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.1. (('1'+t_rev+tv+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t+tv) = ('1'+t_rev+tv+z))  ∥
+                             (∃ z.1. (('1'+'1'+t+tv) = ('1'+t_rev+tv+z+z.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_5
+                  solve( !Time( 'RA', ('1'+t_rev+tv+z) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.1. (('1'+t_rev+tv+z) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+tv+tv+x) = ('1'+t_rev+tv+z))  ∥
+                             (∃ z.1. (('1'+'1'+tv+tv+x) = ('1'+t_rev+tv+z+z.1))) )
+                        case case_1_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_17
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_18
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_19
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_20
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_21
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_22
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_23
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_24
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_25
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_26
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_27
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_28
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_29
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_30
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_31
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_32
+                        by contradiction /* cyclic */
+                      next
+                        case case_2_case_33
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_34
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_35
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_36
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_37
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_38
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_39
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_40
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_41
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_42
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_43
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_44
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_45
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_46
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_47
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_48
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_49
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_50
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_51
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_52
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_53
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_54
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_55
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_56
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_57
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_58
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_59
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_60
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_61
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_62
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_63
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_64
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_65
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_66
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_67
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_68
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_69
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_70
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_71
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_72
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_73
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_74
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_75
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_76
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_77
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_78
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_79
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_80
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_81
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_82
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_83
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_84
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_85
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_86
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_87
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_88
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_89
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_90
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_91
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_92
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_93
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_94
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_95
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_96
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_6
+                  solve( !Time( 'RA', ('1'+t_rev+x+z+x.2) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.1. (('1'+t_rev+x+z+x.2) = (t_rev+z.1)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+x+x+x.1+x.2) = ('1'+t_rev+x+z+x.2))  ∥
+                             (∃ z.1. (('1'+'1'+x+x+x.1+x.2) = ('1'+t_rev+x+z+z.1+x.2))) )
+                        case case_1_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_17
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_18
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_19
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_20
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_21
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_22
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_23
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_24
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_25
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_26
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_27
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_28
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_29
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_30
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_31
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_32
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_33
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_34
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_35
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_36
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_37
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_38
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_39
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_40
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_41
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_42
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_43
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_44
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_45
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_46
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_47
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_48
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_49
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_50
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_51
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_52
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_53
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_54
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_55
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_56
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_57
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_58
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_59
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_60
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_61
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_62
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_63
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_64
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_65
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_66
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_67
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_68
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_69
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_70
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_71
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_72
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_73
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_74
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_75
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_76
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_77
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_78
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_79
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_80
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_81
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_82
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_83
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_84
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_85
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_86
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_87
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_88
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_89
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_90
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_91
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_92
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_93
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_94
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_95
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_96
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2_case_7
+                  solve( !Time( 'RA', ('1'+t_rev+x+z+z.1) ) ▶₃ #i )
+                    case RA_advance_time
+                    solve( (¬(#vr.10 < #k))  ∥
+                           (∀ z.2. (('1'+t_rev+x+z+z.1) = (t_rev+z.2)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+'1'+t+x+x+z) = ('1'+t_rev+x+z+z.1))  ∥
+                             (∃ z.2. (('1'+'1'+t+x+x+z) = ('1'+t_rev+x+z+z.1+z.2))) )
+                        case case_1_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_01
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_02
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_03
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_04
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_05
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_06
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_07
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_08
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_09
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_10
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_11
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_12
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_13
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_14
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_15
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_16
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_17
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_18
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_19
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_20
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_21
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_22
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_23
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_24
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_25
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_26
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_27
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_28
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_29
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_30
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_31
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_32
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_33
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_34
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_35
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_36
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_37
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_38
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_39
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_40
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_41
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_42
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_43
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_44
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_45
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_46
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_47
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_48
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_49
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_50
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_51
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_52
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_53
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_54
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_55
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_56
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_57
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_58
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_59
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_60
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_61
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_62
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_63
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_64
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_65
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_66
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_67
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_68
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_69
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_70
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_71
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_72
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_73
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_74
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_75
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_76
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_77
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_78
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_79
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_80
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_81
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_82
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_83
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_84
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_85
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_86
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_87
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_88
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_89
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_90
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_91
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_92
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_93
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_94
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_95
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_96
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          next
+            case RA_generate_heartbeat_case_2
+            by contradiction /* from formulas */
+          next
+            case RA_generate_heartbeat_case_3
+            by contradiction /* from formulas */
+          next
+            case c_sign
+            by solve( !KU( ~ltk ) @ #vk.9 )
+          qed
+        next
+          case c_sign
+          by solve( !KU( ~ps_key ) @ #vk.5 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_heartbeats_processed_after_tolerance [heuristic=o "oracle.py"]:
+  all-traces
+  "∀ prl t_hb #i.
+    (HeartbeatProcessed( <prl, t_hb> ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ ps t_rev #k.
+          ((RevocationIssued( ps, t_rev ) @ #k) ∧ (#k < #i)) ∧
+          (∃ z. t_hb = (t_rev+tv+z)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ prl t_hb #i.
+  (HeartbeatProcessed( <prl, t_hb> ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ ps t_rev #k.
+      (RevocationIssued( ps, t_rev ) @ #k)
+     ∧
+      (#k < #i) ∧ (∃ z. (t_hb = (t_rev+tv+z)))))"
+*/
+simplify
+solve( HeartbeatProcessed( <prl, t_hb> ) @ #i )
+  case TC_process_heartbeat_no_revoke
+  solve( !Pseudonym( ps ) ▶₂ #i )
+    case Init_case_1
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !Pk( 'RA', pk(x) ) ▶₃ #i )
+        case Init
+        solve( !PRL( prl.1, cnt ) ▶₂ #k )
+          case Init
+          solve( !Parameters( tv ) ▶₁ #i )
+            case Init
+            solve( !KU( sign(<prl, ('1'+t_rev+z)>, ~ltk) ) @ #vk.4 )
+              case RA_generate_heartbeat_case_1
+              solve( (¬(#k < #vr.2))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case RA_generate_heartbeat_case_2
+              by contradiction /* from formulas */
+            next
+              case RA_generate_heartbeat_case_3
+              by contradiction /* from formulas */
+            next
+              case c_sign
+              by solve( !KU( ~ltk ) @ #vk.8 )
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case Init_case_2
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !Pk( 'RA', pk(x) ) ▶₃ #i )
+        case Init
+        solve( !PRL( prl.1, cnt ) ▶₂ #k )
+          case Init
+          solve( !Parameters( tv ) ▶₁ #i )
+            case Init
+            solve( !KU( sign(<prl, ('1'+t_rev+tv+z)>, ~ltk) ) @ #vk.4 )
+              case RA_generate_heartbeat_case_1
+              solve( (¬(#k < #vr.2))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case RA_generate_heartbeat_case_2
+              by contradiction /* from formulas */
+            next
+              case RA_generate_heartbeat_case_3
+              by contradiction /* from formulas */
+            next
+              case c_sign
+              by solve( !KU( ~ltk ) @ #vk.9 )
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case TC_process_heartbeat_revoke
+  solve( !Pseudonym( ps ) ▶₂ #i )
+    case Init_case_1
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !Pk( 'RA', pk(x) ) ▶₃ #i )
+        case Init
+        solve( !PRL( prl.1, cnt ) ▶₂ #k )
+          case Init
+          solve( !Parameters( tv ) ▶₁ #i )
+            case Init
+            solve( !KU( sign(<prl, ('1'+t_rev+z)>, ~ltk) ) @ #vk.4 )
+              case RA_generate_heartbeat_case_1
+              solve( (¬(#k < #vr.2))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case RA_generate_heartbeat_case_2
+              solve( !KU( pk(~ps_key) ) @ #vk.8 )
+                case Init
+                solve( (¬(#vr.4 < #k))  ∥ (∀ z.1. (('1'+'1'+z) = ('1'+z.1)) ⇒ ⊥) )
+                  case case_1
+                  solve( (('1'+t) = ('1'+'1'+z))  ∥ (∃ z.1. (('1'+t) = ('1'+'1'+z+z.1))) )
+                    case case_1
+                    solve( !Time( 'TC', ('1'+z) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+z)>, ~ltk) ) @ #vk.13 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.6))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.14 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case case_2
+                    solve( !Time( 'TC', ('1'+z+z.1) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+z+z.1)>, ~ltk) ) @ #vk.13 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.6))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.15 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case c_pk
+                by solve( !KU( ~ps_key ) @ #vk.9 )
+              qed
+            next
+              case RA_generate_heartbeat_case_3
+              solve( !KU( pk(~ps_key) ) @ #vk.9 )
+                case Init
+                solve( (¬(#vr.4 < #k))  ∥
+                       (∀ z.1. (('1'+'1'+z+t.1) = ('1'+t.1+z.1)) ⇒ ⊥) )
+                  case case_1
+                  solve( (('1'+t) = ('1'+'1'+z+t.1))  ∥
+                         (∃ z.1. (('1'+t) = ('1'+'1'+z+t.1+z.1))) )
+                    case case_1
+                    solve( !Time( 'TC', ('1'+t+z) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+t+z)>, ~ltk) ) @ #vk.15 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.7))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.16 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case case_2
+                    solve( !Time( 'TC', ('1'+t+z+z.1) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+t+z+z.1)>, ~ltk) ) @ #vk.15 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.7))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.17 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case c_pk
+                by solve( !KU( ~ps_key ) @ #vk.11 )
+              qed
+            next
+              case c_sign
+              by solve( !KU( ~ltk ) @ #vk.8 )
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case Init_case_2
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !Pk( 'RA', pk(x) ) ▶₃ #i )
+        case Init
+        solve( !PRL( prl.1, cnt ) ▶₂ #k )
+          case Init
+          solve( !Parameters( tv ) ▶₁ #i )
+            case Init
+            solve( !KU( sign(<prl, ('1'+t_rev+tv+z)>, ~ltk) ) @ #vk.4 )
+              case RA_generate_heartbeat_case_1
+              solve( (¬(#k < #vr.2))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case RA_generate_heartbeat_case_2
+              solve( !KU( pk(~ps_key) ) @ #vk.9 )
+                case Init
+                solve( (¬(#vr.4 < #k))  ∥ (∀ z.1. (('1'+'1'+tv+z) = ('1'+z.1)) ⇒ ⊥) )
+                  case case_1
+                  solve( (('1'+t+tv) = ('1'+'1'+tv+z))  ∥
+                         (∃ z.1. (('1'+t+tv) = ('1'+'1'+tv+z+z.1))) )
+                    case case_1
+                    solve( !Time( 'TC', ('1'+z) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+z)>, ~ltk) ) @ #vk.14 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.6))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.15 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case case_2
+                    solve( !Time( 'TC', ('1'+z+z.1) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+z+z.1)>, ~ltk) ) @ #vk.14 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.6))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.16 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case c_pk
+                by solve( !KU( ~ps_key ) @ #vk.10 )
+              qed
+            next
+              case RA_generate_heartbeat_case_3
+              solve( !KU( pk(~ps_key) ) @ #vk.10 )
+                case Init
+                solve( (¬(#vr.4 < #k))  ∥
+                       (∀ z.1. (('1'+'1'+tv+z+t.1) = ('1'+t.1+z.1)) ⇒ ⊥) )
+                  case case_1
+                  solve( (('1'+t+tv) = ('1'+'1'+tv+z+t.1))  ∥
+                         (∃ z.1. (('1'+t+tv) = ('1'+'1'+tv+z+t.1+z.1))) )
+                    case case_1
+                    solve( !Time( 'TC', ('1'+t+z) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+t+z)>, ~ltk) ) @ #vk.16 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.7))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.17 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case case_2
+                    solve( !Time( 'TC', ('1'+t+z+z.1) ) ▶₀ #i )
+                      case TC_process_heartbeat_no_revoke
+                      solve( !KU( sign(<prl, ('1'+t+z+z.1)>, ~ltk) ) @ #vk.16 )
+                        case RA_generate_heartbeat_case_1
+                        solve( (¬(#k < #vr.7))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                          case case_1
+                          by contradiction /* from formulas */
+                        next
+                          case case_2
+                          by contradiction /* from formulas */
+                        qed
+                      next
+                        case RA_generate_heartbeat_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        by solve( !KU( ~ltk ) @ #vk.18 )
+                      qed
+                    next
+                      case TC_process_heartbeat_revoke
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case c_pk
+                by solve( !KU( ~ps_key ) @ #vk.12 )
+              qed
+            next
+              case c_sign
+              by solve( !KU( ~ltk ) @ #vk.9 )
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end

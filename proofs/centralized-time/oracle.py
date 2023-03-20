@@ -11,9 +11,11 @@ for line in lines:
   num = line.split(':')[0]
 
   if lemma in [
-      "all_signatures_max_epoch_e_rev"
+      "all_signatures_max_time_t_rev"
     , "no_heartbeats_processed_after_tolerance"
     , "effective_revocation"
+    , "processing_hb_possible"
+    , "revocation_possible"
     ]:
     # easy goals
     if "!KU( ~ltk" in line:
@@ -34,15 +36,19 @@ for line in lines:
     # constraints
     elif "#vr." in line and ("#j" in line or "#k" in line):
       goals.setdefault(40, num)
-    elif "'1'+" in line:
+    elif "!Time" not in line and "('1'+t+tv)" in line:
+      goals.setdefault(41, num)
+    elif "('1'+t)" in line:
       goals.setdefault(42, num)
-    elif "!Epoch( 'TC'" in line:
+    elif "'1'+" in line:
       goals.setdefault(43, num)
+    elif "!Time( 'TC'" in line:
+      goals.setdefault(50, num)
 
     # hard goals
-    elif "!Epoch" in line:
+    elif "!Time" in line:
       goals.setdefault(2000, num)
-    elif "TolTmp" in line:
+    elif "TvTmp" in line:
       goals.setdefault(10000, num)
     else:
       goals.setdefault(50, num)

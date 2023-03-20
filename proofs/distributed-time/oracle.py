@@ -41,6 +41,8 @@ for line in lines:
       goals.setdefault(40, num)
     elif "#vr." in line and ("#j" in line or "#k" in line):
       goals.setdefault(41, num)
+    elif "!Time" not in line and "('1'+t_rev" in line:
+      goals.setdefault(42, num)
     elif "!Time" not in line and "Tmp" not in line:
       goals.setdefault(99 - line.count("'1'"), num)
 
@@ -49,10 +51,10 @@ for line in lines:
       goals.setdefault(900, num)
     elif "!Timeout" in line:
       goals.setdefault(1000, num)
+    elif "t = tout" in line:
+      goals.setdefault(1500, num)
     elif "!Time" in line:
       goals.setdefault(2000, num)
-    elif "TrTmp" in line:
-      goals.setdefault(10000, num)
     elif "TvTmp" in line:
       goals.setdefault(20000, num)
     else:
@@ -81,8 +83,6 @@ for line in lines:
       goals.setdefault(1000, num)
     elif "!Time" in line:
       goals.setdefault(2000, num)
-    elif "TrTmp" in line:
-      goals.setdefault(10000, num)
     elif "TvTmp" in line:
       goals.setdefault(20000, num)
     else:
@@ -91,7 +91,7 @@ for line in lines:
   elif lemma in [
     "effective_revocation"
   ]:
-    if "t_rev+tr.1+tv.1+tv.1" in line:
+    if "t_rev+tv.1+tv.1" in line:
       goals.setdefault(1, num)
     else:
       goals.setdefault(900, num)

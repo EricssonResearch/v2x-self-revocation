@@ -1,0 +1,4483 @@
+theory RevocationDistributedTime begin
+
+// Function signature and definition of the equational theory E
+
+builtins: multiset
+functions: fst/1, pair/2, pk/1, sign/2, snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+
+
+predicate: LessThan( x, y )<=>∃ z. (x+z) = y
+
+predicate: LessEqualThan( x, y )<=>(x = y) ∨ (∃ z. (x+z) = y)
+
+predicate: GreaterThan( x, y )<=>∃ z. x = (y+z)
+
+predicate: GreaterEqualThan( x, y )<=>(x = y) ∨ (∃ z. x = (y+z))
+
+predicate: IsNotInList( x, y )<=>(((¬(x = y)) ∧ (¬(∃ a. (a+x) = y))) ∧ (¬(∃ b. (b+x) = y))) ∧
+(¬(∃ c d. (c+d+x) = y))
+
+predicate: IsInList( x, y )<=>(((x = y) ∨ (∃ a. (a+x) = y)) ∨ (∃ b. (b+x) = y)) ∨
+(∃ c d. (c+d+x) = y)
+
+restriction Equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction OnlyOnce:
+  "∀ x #i #j. ((OnlyOnce( x ) @ #i) ∧ (OnlyOnce( x ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction GreaterEqualThan:
+  "∀ x y #i.
+    (GreaterEqualThan( x, y ) @ #i) ⇒ ((x = y) ∨ (∃ z. x = (y+z)))"
+
+restriction IsInList:
+  "∀ x y #i.
+    (IsInList( x, y ) @ #i) ⇒
+    ((((x = y) ∨ (∃ a. (a+x) = y)) ∨ (∃ b. (b+x) = y)) ∨
+     (∃ c d. (c+d+x) = y))"
+
+restriction IsNotInList:
+  "∀ x y #i.
+    (IsNotInList( x, y ) @ #i) ⇒
+    ((((¬(x = y)) ∧ (¬(∃ a. (a+x) = y))) ∧ (¬(∃ b. (b+x) = y))) ∧
+     (¬(∃ c d. (c+d+x) = y)))"
+  // safety formula
+
+restriction IsNotRevoked:
+  "∀ #i.
+    (IsNotRevoked( ) @ #i) ⇒ (¬(∃ t #j. (Revoked( t ) @ #j) ∧ (#j < #i)))"
+  // safety formula
+
+restriction IsLatestTime:
+  "∀ t #i.
+    (IsLatestTime( t ) @ #i) ⇒
+    (¬(∃ t2 #j.
+        ((TimeIncrement( t2 ) @ #j) ∧ (#j < #i)) ∧ (∃ z. t2 = (t+z))))"
+  // safety formula
+
+restriction IsLatestPRL:
+  "∀ cnt #i.
+    (IsLatestPRL( cnt ) @ #i) ⇒
+    (¬(∃ prl cnt2 #j.
+        ((PRLUpdated( prl, cnt2 ) @ #j) ∧ (#j < #i)) ∧ (∃ z. cnt2 = (cnt+z))))"
+  // safety formula
+
+restriction IsLatestTimeout:
+  "∀ t #i.
+    (IsLatestTimeout( t ) @ #i) ⇒
+    (¬(∃ t2 #j. ((NewTimeout( t2 ) @ #j) ∧ (#j < #i)) ∧ (∃ z. t2 = (t+z))))"
+  // safety formula
+
+restriction HasTimeoutNotExpired:
+  "∀ t tout #i.
+    (HasTimeoutNotExpired( t, tout ) @ #i) ⇒
+    ((t = tout) ∨ (∃ z. (t+z) = tout))"
+
+rule (modulo E) init_parameters:
+   [ ] --[ OnlyOnce( 'init_parameters' ) ]-> [ TvTmp( '1' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) increment_Tv:
+   [ TvTmp( tv ) ] --> [ TvTmp( ('1'+tv) ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init:
+   [ Fr( ~ps_key ), Fr( ~ltk ), TvTmp( tv ) ]
+  --[
+  OnlyOnce( 'Init' ), SystemInitialized( tv ), TimeIncrement( '1' ),
+  PseudonymGenerated( pk(~ps_key), '1' ), NewTimeout( ('1'+tv) ),
+  PRLUpdated( '0', '1' )
+  ]->
+   [
+   !Parameters( tv ), !Time( '1' ), !Pseudonym( pk(~ps_key) ),
+   !Ltk( pk(~ps_key), ~ps_key ), !Timeout( ('1'+tv) ), !Ltk( 'RA', ~ltk ),
+   !Pk( 'RA', pk(~ltk) ), !PRL( '0', '1' ), Out( pk(~ltk) ),
+   Out( pk(~ps_key) )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) process_message:
+   [
+   In( <<m, t_v2v>, signature> ), !Parameters( tv ), !Pseudonym( ps ),
+   !Time( t )
+   ]
+  --[
+  Eq( verify(signature, <m, t_v2v>, ps), true ),
+  GreaterEqualThan( (t_v2v+tv), t ), MessageAccepted( <m, t_v2v>, ps, t )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) process_message:
+     [
+     In( <<m, t_v2v>, signature> ), !Parameters( tv ), !Pseudonym( ps ),
+     !Time( t )
+     ]
+    --[
+    Eq( z, true ), GreaterEqualThan( (t_v2v+tv), t ),
+    MessageAccepted( <m, t_v2v>, ps, t )
+    ]->
+     [ ]
+    variants (modulo AC)
+    1. m     = m.8
+       ps    = ps.8
+       signature
+             = signature.8
+       t_v2v = t_v2v.8
+       z     = verify(signature.8, <m.8, t_v2v.8>, ps.8)
+    
+    2. m     = x.8
+       ps    = pk(x.9)
+       signature
+             = sign(<x.8, x.10>, x.9)
+       t_v2v = x.10
+       z     = true
+  */
+
+rule (modulo E) advance_time:
+   [ !Time( t ) ]
+  --[ OnlyOnce( <'advance_time', t> ), TimeIncrement( ('1'+t) ) ]->
+   [ !Time( ('1'+t) ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) TC_sign_message:
+   [
+   !Time( t ), !Timeout( tout ), !Pseudonym( ps ), !Ltk( ps, ps_key ),
+   Fr( ~m )
+   ]
+  --[
+  IsNotRevoked( ), IsLatestTime( t ), IsLatestTimeout( tout ),
+  HasTimeoutNotExpired( t, tout ), Signed( <~m, t>, ps )
+  ]->
+   [ Out( <<~m, t>, sign(<~m, t>, ps_key)> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) TC_process_heartbeat_no_revoke:
+   [
+   !Time( t ), !Parameters( tv ), !Pseudonym( ps ), !Timeout( tout ),
+   !Pk( 'RA', pkRA ), In( <<prl, t_hb>, signature> )
+   ]
+  --[
+  IsNotRevoked( ), IsLatestTimeout( tout ), IsLatestTime( t ),
+  HasTimeoutNotExpired( t, tout ),
+  Eq( verify(signature, <prl, t_hb>, pkRA), true ),
+  GreaterEqualThan( (t_hb+tv), t ), IsNotInList( ps, prl ),
+  HeartbeatProcessed( <prl, t_hb>, t ), NewTimeout( (t_hb+tv) )
+  ]->
+   [ !Timeout( (t_hb+tv) ) ]
+
+  // loop breaker: [3]
+  /*
+  rule (modulo AC) TC_process_heartbeat_no_revoke:
+     [
+     !Time( t ), !Parameters( tv ), !Pseudonym( ps ), !Timeout( tout ),
+     !Pk( 'RA', pkRA ), In( <<prl, t_hb>, signature> )
+     ]
+    --[
+    IsNotRevoked( ), IsLatestTimeout( tout ), IsLatestTime( t ),
+    HasTimeoutNotExpired( t, tout ), Eq( z, true ),
+    GreaterEqualThan( (t_hb+tv), t ), IsNotInList( ps, prl ),
+    HeartbeatProcessed( <prl, t_hb>, t ), NewTimeout( (t_hb+tv) )
+    ]->
+     [ !Timeout( (t_hb+tv) ) ]
+    variants (modulo AC)
+    1. pkRA  = pkRA.12
+       prl   = prl.13
+       signature
+             = signature.15
+       t_hb  = t_hb.17
+       z     = verify(signature.15, <prl.13, t_hb.17>, pkRA.12)
+    
+    2. pkRA  = pk(x.24)
+       prl   = prl.15
+       signature
+             = sign(<prl.15, t_hb.19>, x.24)
+       t_hb  = t_hb.19
+       z     = true
+    // loop breaker: [3]
+  */
+
+rule (modulo E) TC_process_heartbeat_revoke:
+   [
+   !Time( t ), !Parameters( tv ), !Pseudonym( ps ), !Timeout( tout ),
+   !Pk( 'RA', pkRA ), In( <<prl, t_hb>, signature> )
+   ]
+  --[
+  IsNotRevoked( ), IsLatestTimeout( tout ), IsLatestTime( t ),
+  HasTimeoutNotExpired( t, tout ),
+  Eq( verify(signature, <prl, t_hb>, pkRA), true ),
+  GreaterEqualThan( (t_hb+tv), t ), IsInList( ps, prl ),
+  HeartbeatProcessed( <prl, t_hb>, t ), NewTimeout( (t_hb+tv) ),
+  Revoked( t )
+  ]->
+   [ !Timeout( (t_hb+tv) ) ]
+
+  // loop breaker: [3]
+  /*
+  rule (modulo AC) TC_process_heartbeat_revoke:
+     [
+     !Time( t ), !Parameters( tv ), !Pseudonym( ps ), !Timeout( tout ),
+     !Pk( 'RA', pkRA ), In( <<prl, t_hb>, signature> )
+     ]
+    --[
+    IsNotRevoked( ), IsLatestTimeout( tout ), IsLatestTime( t ),
+    HasTimeoutNotExpired( t, tout ), Eq( z, true ),
+    GreaterEqualThan( (t_hb+tv), t ), IsInList( ps, prl ),
+    HeartbeatProcessed( <prl, t_hb>, t ), NewTimeout( (t_hb+tv) ),
+    Revoked( t )
+    ]->
+     [ !Timeout( (t_hb+tv) ) ]
+    variants (modulo AC)
+    1. pkRA  = pkRA.12
+       prl   = prl.13
+       signature
+             = signature.15
+       t_hb  = t_hb.17
+       z     = verify(signature.15, <prl.13, t_hb.17>, pkRA.12)
+    
+    2. pkRA  = pk(x.24)
+       prl   = prl.15
+       signature
+             = sign(<prl.15, t_hb.19>, x.24)
+       t_hb  = t_hb.19
+       z     = true
+    // loop breaker: [3]
+  */
+
+rule (modulo E) TC_do_operation:
+   [ !Time( t ), !Timeout( tout ) ]
+  --[
+  IsNotRevoked( ), IsLatestTimeout( tout ), IsLatestTime( t ),
+  HasTimeoutNotExpired( t, tout ), NewOperation( t )
+  ]->
+   [ ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) RA_generate_heartbeat:
+   [ !Time( t ), !PRL( prl, cnt ), !Ltk( 'RA', ltk ) ]
+  --[
+  IsLatestPRL( cnt ), IsLatestTime( t ),
+  OnlyOnce( <'generate_hb', prl, t> ), HeartbeatGenerated( <prl, t> )
+  ]->
+   [ Out( <<prl, t>, sign(<prl, t>, ltk)> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) RA_issue_revocation:
+   [ !Time( t ), !Pseudonym( ps ), !PRL( prl, cnt ) ]
+  --[
+  IsLatestPRL( cnt ), IsLatestTime( t ),
+  OnlyOnce( <'issue_revocation', ps> ), RevocationIssued( ps, t ),
+  PRLUpdated( (prl+ps), ('1'+cnt) )
+  ]->
+   [ !PRL( (prl+ps), ('1'+cnt) ) ]
+
+  // loop breaker: [2]
+  /* has exactly the trivial AC variant */
+
+lemma sign_possible [heuristic=I]:
+  exists-trace "∃ msg ps #i. Signed( msg, ps ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ msg ps #i. (Signed( msg, ps ) @ #i)"
+*/
+simplify
+solve( !Time( t ) ▶₀ #i )
+  case Init_case_1
+  solve( !Timeout( tout ) ▶₁ #i )
+    case Init
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
+
+lemma generate_hb_possible [heuristic=I]:
+  exists-trace "∃ hb #i. HeartbeatGenerated( hb ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ hb #i. (HeartbeatGenerated( hb ) @ #i)"
+*/
+simplify
+solve( !Time( t ) ▶₀ #i )
+  case Init_case_1
+  solve( !PRL( prl, cnt ) ▶₁ #i )
+    case Init
+    solve( !Ltk( 'RA', ltk ) ▶₂ #i )
+      case Init
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma issue_revocation_possible [heuristic=I]:
+  exists-trace "∃ ps t #i. RevocationIssued( ps, t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ ps t #i. (RevocationIssued( ps, t ) @ #i)"
+*/
+simplify
+solve( !Time( t ) ▶₀ #i )
+  case Init_case_1
+  solve( !Pseudonym( ps ) ▶₁ #i )
+    case Init
+    solve( !PRL( prl, cnt ) ▶₂ #i )
+      case Init
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma process_hb_possible [heuristic=I]:
+  exists-trace "∃ hb t #i. HeartbeatProcessed( hb, t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ hb t #i. (HeartbeatProcessed( hb, t ) @ #i)"
+*/
+simplify
+solve( HeartbeatProcessed( hb, t ) @ #i )
+  case TC_process_heartbeat_no_revoke
+  solve( !Time( t ) ▶₀ #i )
+    case Init_case_1
+    solve( !Parameters( tv ) ▶₁ #i )
+      case Init
+      solve( !Pseudonym( ps ) ▶₂ #i )
+        case Init
+        solve( !Pk( 'RA', pk(x) ) ▶₄ #i )
+          case Init
+          solve( ('1' = tout)  ∥ (∃ z. (('1'+z) = tout)) )
+            case case_2
+            solve( !Timeout( ('1'+z) ) ▶₃ #i )
+              case Init
+              solve( !KU( sign(<prl, '1'>, ~ltk) ) @ #vk.4 )
+                case RA_generate_heartbeat_case_1
+                SOLVED // trace found
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma revocation_possible [heuristic=I]:
+  exists-trace "∃ t #i. Revoked( t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ t #i. (Revoked( t ) @ #i)"
+*/
+simplify
+solve( !Time( t ) ▶₀ #i )
+  case Init_case_1
+  solve( !Parameters( tv ) ▶₁ #i )
+    case Init
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Pk( 'RA', pk(x) ) ▶₄ #i )
+        case Init
+        solve( ('1' = tout)  ∥ (∃ z. (('1'+z) = tout)) )
+          case case_2
+          solve( (pk(~ps_key) = prl)  ∥ (∃ a. ((a+pk(~ps_key)) = prl))  ∥
+                 (∃ b. ((b+pk(~ps_key)) = prl))  ∥ (∃ c d. ((c+d+pk(~ps_key)) = prl)) )
+            case case_2
+            solve( !Timeout( ('1'+z) ) ▶₃ #i )
+              case Init
+              solve( !KU( sign(<(a+pk(~ps_key)), '1'>, ~ltk) ) @ #vk.4 )
+                case RA_generate_heartbeat_case_2
+                solve( !PRL( a, cnt ) ▶₂ #vr.4 )
+                  case Init
+                  solve( !KU( pk(~ps_key) ) @ #vk.6 )
+                    case Init
+                    SOLVED // trace found
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma process_message_possible [heuristic=I]:
+  exists-trace "∃ msg ps t #i. MessageAccepted( msg, ps, t ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ msg ps t #i. (MessageAccepted( msg, ps, t ) @ #i)"
+*/
+simplify
+solve( !Parameters( tv ) ▶₁ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(x) ) ▶₂ #i )
+    case Init
+    solve( !Time( t ) ▶₃ #i )
+      case Init
+      solve( !KU( sign(<m, t_v2v>, ~ps_key) ) @ #vk.4 )
+        case TC_sign_message_case_1
+        solve( !KU( ~m ) @ #vk.3 )
+          case TC_sign_message
+          SOLVED // trace found
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma exists_par_tv_2 [heuristic=I]:
+  exists-trace "∃ tv #i. (SystemInitialized( tv ) @ #i) ∧ (tv = ('1'+'1'))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ tv #i. (SystemInitialized( tv ) @ #i) ∧ (tv = ('1'+'1'))"
+*/
+simplify
+solve( SystemInitialized( ('1'+'1') ) @ #i )
+  case Init
+  solve( TvTmp( ('1'+'1') ) ▶₂ #i )
+    case increment_Tv
+    solve( TvTmp( '1' ) ▶₀ #vr )
+      case init_parameters
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma exists_par_tv_4 [heuristic=I]:
+  exists-trace
+  "∃ tv #i. (SystemInitialized( tv ) @ #i) ∧ (tv = ('1'+'1'+'1'+'1'))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ tv #i. (SystemInitialized( tv ) @ #i) ∧ (tv = ('1'+'1'+'1'+'1'))"
+*/
+simplify
+solve( SystemInitialized( ('1'+'1'+'1'+'1') ) @ #i )
+  case Init
+  solve( TvTmp( ('1'+'1'+'1'+'1') ) ▶₂ #i )
+    case increment_Tv
+    solve( TvTmp( ('1'+'1'+'1') ) ▶₀ #vr )
+      case increment_Tv
+      solve( TvTmp( ('1'+'1') ) ▶₀ #vr.1 )
+        case increment_Tv
+        solve( TvTmp( '1' ) ▶₀ #vr.2 )
+          case init_parameters
+          SOLVED // trace found
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_signing_after_timeout [heuristic=I]:
+  all-traces
+  "∀ m t ps #i.
+    (Signed( <m, t>, ps ) @ #i) ⇒
+    (∃ t2 #j.
+      ((NewTimeout( t2 ) @ #j) ∧ (#j < #i)) ∧ ((t = t2) ∨ (∃ z. (t+z) = t2)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m t ps #i.
+  (Signed( <m, t>, ps ) @ #i)
+ ∧
+  ∀ t2 #j.
+   (NewTimeout( t2 ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨ ((¬(t = t2)) ∧ (∀ z. ((t+z) = t2) ⇒ ⊥)))"
+*/
+simplify
+solve( !Time( t ) ▶₀ #i )
+  case Init_case_1
+  by contradiction /* from formulas */
+next
+  case Init_case_2
+  by contradiction /* from formulas */
+next
+  case advance_time
+  solve( !Timeout( tout ) ▶₁ #i )
+    case Init_case_1
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        solve( (('1'+t) = ('1'+'1'))  ∥ (∃ z. (('1'+t+z) = ('1'+'1'))) )
+          case case_1
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case Init_case_2
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        solve( (('1'+t) = ('1'+'1'+tv))  ∥ (∃ z. (('1'+t+z) = ('1'+'1'+tv))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_1
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        solve( (('1'+t) = ('1'+t_hb))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_2
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        solve( (('1'+t) = ('1'+t_hb+tv))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb+tv))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        next
+          case case_2_case_5
+          by contradiction /* from formulas */
+        next
+          case case_2_case_6
+          by contradiction /* from formulas */
+        next
+          case case_2_case_7
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_3
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        solve( (('1'+t) = ('1'+t_hb))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_4
+    solve( !Pseudonym( ps ) ▶₂ #i )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #i )
+        case Init
+        solve( (('1'+t) = ('1'+t_hb+tv))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb+tv))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        next
+          case case_2_case_5
+          by contradiction /* from formulas */
+        next
+          case case_2_case_6
+          by contradiction /* from formulas */
+        next
+          case case_2_case_7
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_revoke_case_1
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_2
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_3
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_4
+    by contradiction /* from formulas */
+  qed
+qed
+
+lemma no_signing_after_revocation [heuristic=I]:
+  all-traces
+  "∀ msg ps #i.
+    (Signed( msg, ps ) @ #i) ⇒
+    (¬(∃ t2 #j. (Revoked( t2 ) @ #j) ∧ (#j < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ msg ps #i.
+  (Signed( msg, ps ) @ #i) ∧ ∃ t2 #j. (Revoked( t2 ) @ #j) ∧ #j < #i"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma all_heartbeats_processed_within_tolerance [heuristic=o "oracle.py"]:
+  all-traces
+  "∀ prl t_hb t #i.
+    (HeartbeatProcessed( <prl, t_hb>, t ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (((t_hb+tv) = t) ∨ (∃ z. (t_hb+tv) = (t+z))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ prl t_hb t #i.
+  (HeartbeatProcessed( <prl, t_hb>, t ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨ ((¬((t_hb+tv) = t)) ∧ (∀ z. ((t_hb+tv) = (t+z)) ⇒ ⊥)))"
+*/
+simplify
+solve( HeartbeatProcessed( <prl, t_hb>, t ) @ #i )
+  case TC_process_heartbeat_no_revoke
+  solve( !Pseudonym( ps ) ▶₂ #i )
+    case Init_case_1
+    solve( !Parameters( tv ) ▶₁ #i )
+      case Init
+      solve( (t = tout)  ∥ (∃ z. ((t+z) = tout)) )
+        case case_1
+        solve( (('1'+t_hb) = t)  ∥ (∃ z. (('1'+t_hb) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        solve( (('1'+t_hb) = t)  ∥ (∃ z. (('1'+t_hb) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case Init_case_2
+    solve( !Parameters( tv ) ▶₁ #i )
+      case Init
+      solve( (t = tout)  ∥ (∃ z. ((t+z) = tout)) )
+        case case_1
+        solve( (('1'+t_hb+tv) = t)  ∥ (∃ z. (('1'+t_hb+tv) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_01
+          by contradiction /* from formulas */
+        next
+          case case_2_case_02
+          by contradiction /* from formulas */
+        next
+          case case_2_case_03
+          by contradiction /* from formulas */
+        next
+          case case_2_case_04
+          by contradiction /* from formulas */
+        next
+          case case_2_case_05
+          by contradiction /* from formulas */
+        next
+          case case_2_case_06
+          by contradiction /* from formulas */
+        next
+          case case_2_case_07
+          by contradiction /* from formulas */
+        next
+          case case_2_case_08
+          by contradiction /* from formulas */
+        next
+          case case_2_case_09
+          by contradiction /* from formulas */
+        next
+          case case_2_case_10
+          by contradiction /* from formulas */
+        next
+          case case_2_case_11
+          by contradiction /* from formulas */
+        next
+          case case_2_case_12
+          by contradiction /* from formulas */
+        next
+          case case_2_case_13
+          by contradiction /* from formulas */
+        next
+          case case_2_case_14
+          by contradiction /* from formulas */
+        next
+          case case_2_case_15
+          by contradiction /* from formulas */
+        next
+          case case_2_case_16
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        solve( (('1'+t_hb+tv) = t)  ∥ (∃ z. (('1'+t_hb+tv) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_01
+          by contradiction /* from formulas */
+        next
+          case case_2_case_02
+          by contradiction /* from formulas */
+        next
+          case case_2_case_03
+          by contradiction /* from formulas */
+        next
+          case case_2_case_04
+          by contradiction /* from formulas */
+        next
+          case case_2_case_05
+          by contradiction /* from formulas */
+        next
+          case case_2_case_06
+          by contradiction /* from formulas */
+        next
+          case case_2_case_07
+          by contradiction /* from formulas */
+        next
+          case case_2_case_08
+          by contradiction /* from formulas */
+        next
+          case case_2_case_09
+          by contradiction /* from formulas */
+        next
+          case case_2_case_10
+          by contradiction /* from formulas */
+        next
+          case case_2_case_11
+          by contradiction /* from formulas */
+        next
+          case case_2_case_12
+          by contradiction /* from formulas */
+        next
+          case case_2_case_13
+          by contradiction /* from formulas */
+        next
+          case case_2_case_14
+          by contradiction /* from formulas */
+        next
+          case case_2_case_15
+          by contradiction /* from formulas */
+        next
+          case case_2_case_16
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  qed
+next
+  case TC_process_heartbeat_revoke
+  solve( !Pseudonym( ps ) ▶₂ #i )
+    case Init_case_1
+    solve( !Parameters( tv ) ▶₁ #i )
+      case Init
+      solve( (t = tout)  ∥ (∃ z. ((t+z) = tout)) )
+        case case_1
+        solve( (('1'+t_hb) = t)  ∥ (∃ z. (('1'+t_hb) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        solve( (('1'+t_hb) = t)  ∥ (∃ z. (('1'+t_hb) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_2
+          by contradiction /* from formulas */
+        next
+          case case_2_case_3
+          by contradiction /* from formulas */
+        next
+          case case_2_case_4
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case Init_case_2
+    solve( !Parameters( tv ) ▶₁ #i )
+      case Init
+      solve( (t = tout)  ∥ (∃ z. ((t+z) = tout)) )
+        case case_1
+        solve( (('1'+t_hb+tv) = t)  ∥ (∃ z. (('1'+t_hb+tv) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_01
+          by contradiction /* from formulas */
+        next
+          case case_2_case_02
+          by contradiction /* from formulas */
+        next
+          case case_2_case_03
+          by contradiction /* from formulas */
+        next
+          case case_2_case_04
+          by contradiction /* from formulas */
+        next
+          case case_2_case_05
+          by contradiction /* from formulas */
+        next
+          case case_2_case_06
+          by contradiction /* from formulas */
+        next
+          case case_2_case_07
+          by contradiction /* from formulas */
+        next
+          case case_2_case_08
+          by contradiction /* from formulas */
+        next
+          case case_2_case_09
+          by contradiction /* from formulas */
+        next
+          case case_2_case_10
+          by contradiction /* from formulas */
+        next
+          case case_2_case_11
+          by contradiction /* from formulas */
+        next
+          case case_2_case_12
+          by contradiction /* from formulas */
+        next
+          case case_2_case_13
+          by contradiction /* from formulas */
+        next
+          case case_2_case_14
+          by contradiction /* from formulas */
+        next
+          case case_2_case_15
+          by contradiction /* from formulas */
+        next
+          case case_2_case_16
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        solve( (('1'+t_hb+tv) = t)  ∥ (∃ z. (('1'+t_hb+tv) = (t+z))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_2_case_01
+          by contradiction /* from formulas */
+        next
+          case case_2_case_02
+          by contradiction /* from formulas */
+        next
+          case case_2_case_03
+          by contradiction /* from formulas */
+        next
+          case case_2_case_04
+          by contradiction /* from formulas */
+        next
+          case case_2_case_05
+          by contradiction /* from formulas */
+        next
+          case case_2_case_06
+          by contradiction /* from formulas */
+        next
+          case case_2_case_07
+          by contradiction /* from formulas */
+        next
+          case case_2_case_08
+          by contradiction /* from formulas */
+        next
+          case case_2_case_09
+          by contradiction /* from formulas */
+        next
+          case case_2_case_10
+          by contradiction /* from formulas */
+        next
+          case case_2_case_11
+          by contradiction /* from formulas */
+        next
+          case case_2_case_12
+          by contradiction /* from formulas */
+        next
+          case case_2_case_13
+          by contradiction /* from formulas */
+        next
+          case case_2_case_14
+          by contradiction /* from formulas */
+        next
+          case case_2_case_15
+          by contradiction /* from formulas */
+        next
+          case case_2_case_16
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma all_messages_accepted_signed_exists [reuse,
+                                           heuristic=o "oracle.py"]:
+  all-traces
+  "∀ msg ps t #i.
+    (MessageAccepted( msg, ps, t ) @ #i) ⇒
+    (∃ #j. (Signed( msg, ps ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ msg ps t #i.
+  (MessageAccepted( msg, ps, t ) @ #i)
+ ∧
+  ∀ #j. (Signed( msg, ps ) @ #j) ⇒ ¬(#j < #i)"
+*/
+simplify
+solve( !Pseudonym( pk(x) ) ▶₂ #i )
+  case Init_case_1
+  solve( !Parameters( tv ) ▶₁ #i )
+    case Init
+    solve( !KU( sign(<m, t_v2v>, ~ps_key) ) @ #vk.4 )
+      case TC_sign_message_case_1
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_2
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_3
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_4
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_5
+      by contradiction /* from formulas */
+    next
+      case c_sign
+      by solve( !KU( ~ps_key ) @ #vk.5 )
+    qed
+  qed
+next
+  case Init_case_2
+  solve( !Parameters( tv ) ▶₁ #i )
+    case Init
+    solve( !KU( sign(<m, t_v2v>, ~ps_key) ) @ #vk.4 )
+      case TC_sign_message_case_1
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_2
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_3
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_4
+      by contradiction /* from formulas */
+    next
+      case TC_sign_message_case_5
+      by contradiction /* from formulas */
+    next
+      case c_sign
+      by solve( !KU( ~ps_key ) @ #vk.5 )
+    qed
+  qed
+qed
+
+lemma all_messages_accepted_within_tolerance [reuse,
+                                              heuristic=o "oracle.py"]:
+  all-traces
+  "∀ m t_v2v ps t #i.
+    (MessageAccepted( <m, t_v2v>, ps, t ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (((t_v2v+tv) = t) ∨ (∃ z. (t_v2v+tv) = (t+z))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m t_v2v ps t #i.
+  (MessageAccepted( <m, t_v2v>, ps, t ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨ ((¬((t_v2v+tv) = t)) ∧ (∀ z. ((t_v2v+tv) = (t+z)) ⇒ ⊥)))"
+*/
+simplify
+solve( !Pseudonym( pk(x) ) ▶₂ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+    case Init
+    solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+      case Init
+      solve( !Parameters( tv ) ▶₁ #i )
+        case Init
+        solve( (t_v2v = tout)  ∥ (∃ z. ((t_v2v+z) = tout)) )
+          case case_1
+          solve( (('1'+t_v2v) = t)  ∥ (∃ z. (('1'+t_v2v) = (t+z))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_2_case_1
+            by contradiction /* from formulas */
+          next
+            case case_2_case_2
+            by contradiction /* from formulas */
+          next
+            case case_2_case_3
+            by contradiction /* from formulas */
+          next
+            case case_2_case_4
+            by contradiction /* from formulas */
+          qed
+        next
+          case case_2
+          solve( (('1'+t_v2v) = t)  ∥ (∃ z. (('1'+t_v2v) = (t+z))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_2_case_1
+            by contradiction /* from formulas */
+          next
+            case case_2_case_2
+            by contradiction /* from formulas */
+          next
+            case case_2_case_3
+            by contradiction /* from formulas */
+          next
+            case case_2_case_4
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Init_case_2
+  solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+    case Init
+    solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+      case Init
+      solve( !Parameters( tv ) ▶₁ #i )
+        case Init
+        solve( (t_v2v = tout)  ∥ (∃ z. ((t_v2v+z) = tout)) )
+          case case_1
+          solve( (('1'+t_v2v+tv) = t)  ∥ (∃ z. (('1'+t_v2v+tv) = (t+z))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_2_case_01
+            by contradiction /* from formulas */
+          next
+            case case_2_case_02
+            by contradiction /* from formulas */
+          next
+            case case_2_case_03
+            by contradiction /* from formulas */
+          next
+            case case_2_case_04
+            by contradiction /* from formulas */
+          next
+            case case_2_case_05
+            by contradiction /* from formulas */
+          next
+            case case_2_case_06
+            by contradiction /* from formulas */
+          next
+            case case_2_case_07
+            by contradiction /* from formulas */
+          next
+            case case_2_case_08
+            by contradiction /* from formulas */
+          next
+            case case_2_case_09
+            by contradiction /* from formulas */
+          next
+            case case_2_case_10
+            by contradiction /* from formulas */
+          next
+            case case_2_case_11
+            by contradiction /* from formulas */
+          next
+            case case_2_case_12
+            by contradiction /* from formulas */
+          next
+            case case_2_case_13
+            by contradiction /* from formulas */
+          next
+            case case_2_case_14
+            by contradiction /* from formulas */
+          next
+            case case_2_case_15
+            by contradiction /* from formulas */
+          next
+            case case_2_case_16
+            by contradiction /* from formulas */
+          qed
+        next
+          case case_2
+          solve( (('1'+t_v2v+tv) = t)  ∥ (∃ z. (('1'+t_v2v+tv) = (t+z))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_2_case_01
+            by contradiction /* from formulas */
+          next
+            case case_2_case_02
+            by contradiction /* from formulas */
+          next
+            case case_2_case_03
+            by contradiction /* from formulas */
+          next
+            case case_2_case_04
+            by contradiction /* from formulas */
+          next
+            case case_2_case_05
+            by contradiction /* from formulas */
+          next
+            case case_2_case_06
+            by contradiction /* from formulas */
+          next
+            case case_2_case_07
+            by contradiction /* from formulas */
+          next
+            case case_2_case_08
+            by contradiction /* from formulas */
+          next
+            case case_2_case_09
+            by contradiction /* from formulas */
+          next
+            case case_2_case_10
+            by contradiction /* from formulas */
+          next
+            case case_2_case_11
+            by contradiction /* from formulas */
+          next
+            case case_2_case_12
+            by contradiction /* from formulas */
+          next
+            case case_2_case_13
+            by contradiction /* from formulas */
+          next
+            case case_2_case_14
+            by contradiction /* from formulas */
+          next
+            case case_2_case_15
+            by contradiction /* from formulas */
+          next
+            case case_2_case_16
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_messages_accepted_with_timestamp_t_sign [reuse,
+                                                  heuristic=o "oracle.py"]:
+  all-traces
+  "∀ m t_v2v ps t #i.
+    (MessageAccepted( <m, t_v2v>, ps, t ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ t_rev #k.
+          ((RevocationIssued( ps, t_rev ) @ #k) ∧ (#k < #i)) ∧
+          (∃ z. t_v2v = (t_rev+tv+z)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m t_v2v ps t #i.
+  (MessageAccepted( <m, t_v2v>, ps, t ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ t_rev #k.
+      (RevocationIssued( ps, t_rev ) @ #k)
+     ∧
+      (#k < #i) ∧ (∃ z. (t_v2v = (t_rev+tv+z)))))"
+*/
+simplify
+solve( !Pseudonym( pk(x) ) ▶₂ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j.1 )
+    case Init
+    solve( !Pseudonym( pk(~ps_key) ) ▶₁ #k )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j.1 )
+        case Init
+        solve( !PRL( prl, cnt ) ▶₂ #k )
+          case Init
+          solve( !Parameters( tv ) ▶₁ #i )
+            case Init
+            solve( !KU( sign(<~m, ('1'+t_rev+z)>, ~ps_key) ) @ #vk.4 )
+              case TC_sign_message_case_1
+              solve( !KU( sign(<prl, t_hb>, ~ltk) ) @ #vk.12 )
+                case RA_generate_heartbeat_case_1
+                by contradiction /* from formulas */
+              next
+                case RA_generate_heartbeat_case_2
+                by contradiction /* from formulas */
+              next
+                case RA_generate_heartbeat_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                by solve( !KU( ~ltk ) @ #vk.13 )
+              qed
+            next
+              case TC_sign_message_case_2
+              solve( !KU( sign(<prl, t_hb>, ~ltk) ) @ #vk.12 )
+                case RA_generate_heartbeat_case_1
+                solve( (¬(#vr.2 < #k))  ∥ (∀ z.1. (('1'+t_rev+z) = (t_rev+z.1)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#vr.4 < #k))  ∥ (∀ z. (('1'+t.2) = (t_rev+z)) ⇒ ⊥) )
+                    case case_1
+                    solve( (¬(#k < #vr.5))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+t_rev+z) = ('1'+'1'+t.1))  ∥
+                             (∃ z.1. (('1'+t_rev+z+z.1) = ('1'+'1'+t.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* cyclic */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case case_2
+                    solve( (¬(#k < #vr.5))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+t_rev+z) = ('1'+'1'+t.1))  ∥
+                             (∃ z.1. (('1'+t_rev+z+z.1) = ('1'+'1'+t.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* cyclic */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case RA_generate_heartbeat_case_2
+                by contradiction /* from formulas */
+              next
+                case RA_generate_heartbeat_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                by solve( !KU( ~ltk ) @ #vk.13 )
+              qed
+            next
+              case c_sign
+              by solve( !KU( ~ps_key ) @ #vk.8 )
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Init_case_2
+  solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j.1 )
+    case Init
+    solve( !Pseudonym( pk(~ps_key) ) ▶₁ #k )
+      case Init
+      solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j.1 )
+        case Init
+        solve( !PRL( prl, cnt ) ▶₂ #k )
+          case Init
+          solve( !Parameters( tv.1 ) ▶₁ #i )
+            case Init
+            solve( !KU( sign(<~m, ('1'+t_rev+tv+z)>, ~ps_key) ) @ #vk.4 )
+              case TC_sign_message_case_1
+              solve( !KU( sign(<prl, t_hb>, ~ltk) ) @ #vk.14 )
+                case RA_generate_heartbeat_case_1
+                by contradiction /* from formulas */
+              next
+                case RA_generate_heartbeat_case_2
+                by contradiction /* from formulas */
+              next
+                case RA_generate_heartbeat_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                by solve( !KU( ~ltk ) @ #vk.15 )
+              qed
+            next
+              case TC_sign_message_case_2
+              solve( !KU( sign(<prl, t_hb>, ~ltk) ) @ #vk.14 )
+                case RA_generate_heartbeat_case_1
+                solve( (¬(#vr.2 < #k))  ∥ (∀ z.1. (('1'+t_rev+tv+z) = (t_rev+z.1)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#vr.4 < #k))  ∥ (∀ z. (('1'+t.2) = (t_rev+z)) ⇒ ⊥) )
+                    case case_1
+                    solve( (¬(#k < #vr.5))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+t_rev+tv+z) = ('1'+'1'+tv+t.1))  ∥
+                             (∃ z.1. (('1'+t_rev+tv+z+z.1) = ('1'+'1'+tv+t.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case case_2
+                    solve( (¬(#k < #vr.5))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                      case case_1
+                      solve( (('1'+t_rev+tv+z) = ('1'+'1'+tv+t.1))  ∥
+                             (∃ z.1. (('1'+t_rev+tv+z+z.1) = ('1'+'1'+tv+t.1))) )
+                        case case_1_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_1_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_4
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_5
+                        by contradiction /* from formulas */
+                      next
+                        case case_2_case_6
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case case_2
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case RA_generate_heartbeat_case_2
+                by contradiction /* from formulas */
+              next
+                case RA_generate_heartbeat_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                by solve( !KU( ~ltk ) @ #vk.15 )
+              qed
+            next
+              case c_sign
+              by solve( !KU( ~ps_key ) @ #vk.10 )
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma effective_revocation [heuristic=o "oracle.py"]:
+  all-traces
+  "∀ msg ps t #i.
+    (MessageAccepted( msg, ps, t ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ t_rev #k.
+          ((RevocationIssued( ps, t_rev ) @ #k) ∧ (#k < #i)) ∧
+          (∃ z. t = (t_rev+tv+tv+z)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ msg ps t #i.
+  (MessageAccepted( msg, ps, t ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ t_rev #k.
+      (RevocationIssued( ps, t_rev ) @ #k)
+     ∧
+      (#k < #i) ∧ (∃ z. (t = (t_rev+tv+tv+z)))))"
+*/
+simplify
+solve( !Parameters( tv ) ▶₁ #i )
+  case Init_case_1
+  solve( !Pseudonym( pk(x) ) ▶₂ #i )
+    case Init
+    solve( !Time( ('1'+'1'+t_rev+z) ) ▶₃ #i )
+      case advance_time
+      solve( !Time( t_v2v ) ▶₀ #j )
+        case advance_time
+        solve( !Timeout( tout ) ▶₁ #j )
+          case Init
+          solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+            case Init
+            solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+              case Init
+              by solve( (('1'+t) = ('1'+'1'))  ∥ (∃ z. (('1'+t+z) = ('1'+'1'))) )
+            qed
+          qed
+        next
+          case TC_process_heartbeat_no_revoke_case_1
+          solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+            case Init
+            solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+              case Init
+              solve( (('1'+t) = ('1'+t_hb))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb))) )
+                case case_1
+                solve( (('1'+'1'+t) = ('1'+'1'+t_rev+z))  ∥
+                       (∃ z.1. (('1'+'1'+t) = ('1'+'1'+t_rev+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (('1'+'1'+t) = ('1'+'1'+t_rev+z))  ∥
+                       (∃ z.1. (('1'+'1'+t) = ('1'+'1'+t_rev+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case TC_process_heartbeat_no_revoke_case_2
+          solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+            case Init
+            solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+              case Init
+              solve( (('1'+t) = ('1'+t_hb))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb))) )
+                case case_1
+                solve( (('1'+'1'+t) = ('1'+'1'+t_rev+z))  ∥
+                       (∃ z.1. (('1'+'1'+t) = ('1'+'1'+t_rev+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (('1'+'1'+t) = ('1'+'1'+t_rev+z))  ∥
+                       (∃ z.1. (('1'+'1'+t) = ('1'+'1'+t_rev+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case TC_process_heartbeat_revoke_case_1
+          by contradiction /* from formulas */
+        next
+          case TC_process_heartbeat_revoke_case_2
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  qed
+next
+  case Init_case_2
+  solve( !Pseudonym( pk(x) ) ▶₂ #i )
+    case Init
+    solve( !Time( ('1'+'1'+t_rev+tv+tv+z) ) ▶₃ #i )
+      case advance_time
+      solve( !Time( t_v2v ) ▶₀ #j )
+        case advance_time
+        solve( !Timeout( tout ) ▶₁ #j )
+          case Init
+          solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+            case Init
+            solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+              case Init
+              by solve( (('1'+t) = ('1'+'1'+tv))  ∥ (∃ z. (('1'+t+z) = ('1'+'1'+tv))) )
+            qed
+          qed
+        next
+          case TC_process_heartbeat_no_revoke_case_1
+          solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+            case Init
+            solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+              case Init
+              solve( (('1'+t) = ('1'+t_hb+tv))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb+tv))) )
+                case case_1
+                solve( (('1'+'1'+t_hb+tv+tv) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+t_hb+tv+tv) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_1
+                solve( (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_2
+                solve( (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_3
+                solve( (('1'+'1'+t_hb+x+x+z) = ('1'+'1'+t_rev+x+x+z+z+z.1))  ∥
+                       (∃ z.2. (('1'+'1'+t_hb+x+x+z) = ('1'+'1'+t_rev+x+x+z+z+z.1+z.2))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_4
+                solve( (('1'+'1'+x+x.1+x.1+x.2) = ('1'+'1'+t_rev+z+x.1+x.1+x.2+x.2))  ∥
+                       (∃ z.1.
+                         (('1'+'1'+x+x.1+x.1+x.2) = ('1'+'1'+t_rev+z+x.1+x.1+z.1+x.2+x.2))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_5
+                solve( (('1'+'1'+tv+tv+x) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+tv+tv+x) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case TC_process_heartbeat_no_revoke_case_2
+          solve( !Pseudonym( pk(~ps_key) ) ▶₂ #j )
+            case Init
+            solve( !Ltk( pk(~ps_key), ps_key.1 ) ▶₃ #j )
+              case Init
+              solve( (('1'+t) = ('1'+t_hb+tv))  ∥ (∃ z. (('1'+t+z) = ('1'+t_hb+tv))) )
+                case case_1
+                solve( (('1'+'1'+t_hb+tv+tv) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+t_hb+tv+tv) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_1
+                solve( (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_2
+                solve( (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+t+tv) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_3
+                solve( (('1'+'1'+t_hb+x+x+z) = ('1'+'1'+t_rev+x+x+z+z+z.1))  ∥
+                       (∃ z.2. (('1'+'1'+t_hb+x+x+z) = ('1'+'1'+t_rev+x+x+z+z+z.1+z.2))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_4
+                solve( (('1'+'1'+x+x.1+x.1+x.2) = ('1'+'1'+t_rev+z+x.1+x.1+x.2+x.2))  ∥
+                       (∃ z.1.
+                         (('1'+'1'+x+x.1+x.1+x.2) = ('1'+'1'+t_rev+z+x.1+x.1+z.1+x.2+x.2))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2_case_5
+                solve( (('1'+'1'+tv+tv+x) = ('1'+'1'+t_rev+tv+tv+z))  ∥
+                       (∃ z.1. (('1'+'1'+tv+tv+x) = ('1'+'1'+t_rev+tv+tv+z+z.1))) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case TC_process_heartbeat_revoke_case_1
+          by contradiction /* from formulas */
+        next
+          case TC_process_heartbeat_revoke_case_2
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_operations_after_timeout [heuristic=o "oracle.py"]:
+  all-traces
+  "∀ t #i.
+    (NewOperation( t ) @ #i) ⇒
+    (∃ tv #j.
+      ((SystemInitialized( tv ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ ps t_rev #k.
+          ((RevocationIssued( ps, t_rev ) @ #k) ∧ (#k < #i)) ∧
+          (∃ z. t = (t_rev+tv+z)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ t #i.
+  (NewOperation( t ) @ #i)
+ ∧
+  ∀ tv #j.
+   (SystemInitialized( tv ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ ps t_rev #k.
+      (RevocationIssued( ps, t_rev ) @ #k)
+     ∧
+      (#k < #i) ∧ (∃ z. (t = (t_rev+tv+z)))))"
+*/
+simplify
+solve( (t = tout)  ∥ (∃ z. ((t+z) = tout)) )
+  case case_1
+  solve( !Timeout( t ) ▶₁ #i )
+    case TC_process_heartbeat_no_revoke_case_1
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.7 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_2
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.7 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_3
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+'1'+t_rev+x) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+'1'+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+x+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.7 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_4
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+tv+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev+tv) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+tv) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+'1'+t_rev+tv+x) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+tv+x) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+'1'+tv+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+tv+x+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.7 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_revoke_case_1
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_2
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_3
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_4
+    by contradiction /* from formulas */
+  qed
+next
+  case case_2
+  solve( !Timeout( (t+z) ) ▶₁ #i )
+    case TC_process_heartbeat_no_revoke_case_01
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_02
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_03
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_04
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+tv+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_05
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+tv+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.11 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_06
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_07
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+tv+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_17
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_18
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_19
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_20
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_21
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_22
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_08
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_09
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+x.1+x.2)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_17
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_18
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_19
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_20
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_21
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_22
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_10
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_02
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_03
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_11
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_12
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z+x.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_13
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_14
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z+x.1+x.2)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.11 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_15
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( !Time( ('1'+t_rev+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_16
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_17
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+t_rev+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_05
+          solve( !Time( ('1'+'1'+t_rev+x) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_06
+          solve( !Time( ('1'+'1'+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+x+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_18
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+tv+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( !Time( ('1'+t_rev+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_19
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+tv+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.11 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_20
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+z+z.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+z+z.1) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+'1'+t_rev+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+'1'+t_rev+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          solve( !Time( ('1'+'1'+t_rev+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_06
+          solve( !Time( ('1'+'1'+x+z+z.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+x+z+z.1) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_21
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+tv+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+tv+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+t_rev+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+'1'+t_rev+tv) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+tv) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          solve( !Time( ('1'+'1'+t_rev+tv+x) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+tv+x) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_06
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_07
+          solve( !Time( ('1'+'1'+t_rev+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_08
+          solve( !Time( ('1'+'1'+tv+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+tv+x+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_17
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_18
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_19
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_20
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_21
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_22
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_22
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+x+z+z.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+x+z+z.1) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+'1'+t_rev+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+'1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          solve( !Time( ('1'+'1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_06
+          solve( !Time( ('1'+'1'+x+z+x.1+z.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+x+z+x.1+z.1) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_23
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+x.1+x.2)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+x+z+x.1) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev+x+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+x.1) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+'1'+t_rev+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_06
+          solve( !Time( ('1'+'1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_07
+          solve( !Time( ('1'+'1'+t_rev+x+x.1+x.2) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+x+x.1+x.2) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_08
+          solve( !Time( ('1'+'1'+x+z+x.1+x.2) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+x+z+x.1+x.2) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_17
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_18
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_19
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_20
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_21
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_22
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_24
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, (t_rev+z+z.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_01
+          solve( !Time( ('1'+'1'+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( '1' ) ▶₀ #k )
+              case Init
+              solve( !Time( ('1'+tv+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_02
+          solve( !Time( ('1'+'1'+t_rev+tv) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+tv) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_03
+          solve( !Time( ('1'+t_rev+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_04
+          solve( !Time( ('1'+t_rev+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_05
+          solve( !Time( ('1'+'1'+t_rev+tv+x) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+t_rev+tv+x) ) ▶₀ #vr.7 )
+              case advance_time
+              solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+                case case_1
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              next
+                case case_2
+                solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                  case case_1
+                  by contradiction /* from formulas */
+                next
+                  case case_2
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_06
+          solve( !Time( ('1'+'1'+tv+x+z) ) ▶₀ #i )
+            case advance_time
+            solve( !Time( ('1'+x) ) ▶₀ #k )
+              case advance_time
+              solve( !Time( ('1'+tv+x+z) ) ▶₀ #vr.7 )
+                case advance_time
+                solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = ('1'+x+z)) ⇒ ⊥) )
+                  case case_1
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                next
+                  case case_2
+                  solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                    case case_1
+                    by contradiction /* from formulas */
+                  next
+                    case case_2
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_07
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_08
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_09
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_10
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_11
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_12
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_13
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_14
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_15
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_16
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_25
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( !Time( ('1'+t_rev+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.8 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_26
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z+x.1)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.9 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_27
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+x+z)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( !Time( ('1'+t_rev+tv+z) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.10 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_no_revoke_case_28
+    solve( !Pseudonym( ps ) ▶₁ #k )
+      case Init
+      solve( !PRL( prl, cnt ) ▶₂ #k )
+        case Init
+        solve( !KU( sign(<prl, ('1'+t_rev+z+x.1+x.2)>, ~ltk) ) @ #vk.4 )
+          case RA_generate_heartbeat_case_1
+          solve( !Time( ('1'+t_rev+x+z+x.1) ) ▶₀ #i )
+            case advance_time
+            solve( (¬(#vr.1 < #k))  ∥ (∀ z. (('1'+t) = (t_rev+z)) ⇒ ⊥) )
+              case case_1
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            next
+              case case_2
+              solve( (¬(#k < #vr.4))  ∥ (∀ z. (('1'+'1') = ('1'+z)) ⇒ ⊥) )
+                case case_1
+                by contradiction /* from formulas */
+              next
+                case case_2
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        next
+          case RA_generate_heartbeat_case_2
+          by contradiction /* from formulas */
+        next
+          case RA_generate_heartbeat_case_3
+          by contradiction /* from formulas */
+        next
+          case c_sign
+          by solve( !KU( ~ltk ) @ #vk.11 )
+        qed
+      qed
+    qed
+  next
+    case TC_process_heartbeat_revoke_case_01
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_02
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_03
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_04
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_05
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_06
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_07
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_08
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_09
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_10
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_11
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_12
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_13
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_14
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_15
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_16
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_17
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_18
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_19
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_20
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_21
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_22
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_23
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_24
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_25
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_26
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_27
+    by contradiction /* from formulas */
+  next
+    case TC_process_heartbeat_revoke_case_28
+    by contradiction /* from formulas */
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end

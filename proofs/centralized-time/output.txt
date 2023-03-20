@@ -1,0 +1,21 @@
+==============================================================================
+summary of summaries:
+
+analyzed: theory.spthy
+
+  output:          out/tamarin-centralized-output.spthy
+  processing time: 137.451573722s
+  sign_possible (exists-trace): verified (5 steps)
+  generate_hb_possible (exists-trace): verified (5 steps)
+  issue_revocation_possible (exists-trace): verified (5 steps)
+  processing_hb_possible (exists-trace): verified (14 steps)
+  revocation_possible (exists-trace): verified (11 steps)
+  process_message_possible (exists-trace): verified (7 steps)
+  exists_par_tv_5 (exists-trace): verified (8 steps)
+  exists_par_tv_8 (exists-trace): verified (11 steps)
+  no_signing_after_revocation (all-traces): verified (2 steps)
+  all_signatures_max_time_t_rev (all-traces): verified (55 steps)
+  effective_revocation (all-traces): verified (576 steps)
+  no_heartbeats_processed_after_tolerance (all-traces): verified (128 steps)
+
+==============================================================================

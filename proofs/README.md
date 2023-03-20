@@ -1,53 +1,52 @@
 # Tamarin models
 
 Two folders:
-- `sol1` is the model for the protocol that uses trusted time (Sect. 4.1)
-- `sol2` is the model for the protocol that uses epochs (Sect. 4.2)
+- `centralized-time` is the model for the main design (RA distributing timing
+  information to TCs)
+- `distributed-time` is the model for the design that uses a local trusted time
+  source in TCs.
 
 The models are defined in the files called `theory.spthy`. 
 
 We successfully verified all the lemmas in the models using Tamarin version
-`1.7.1`. Outputs from previous execution are found in `output.txt` and
+`1.6.1`. Outputs from previous execution are found in `output.txt` and
 `output.spthy`.
 
 The oracles `oracle.py` help Tamarin to create efficient proofs and allow it to
 terminate. Without it, Tamarin would either use too much memory or get stuck in
 some proofs.
 
-More details can be found in the paper (Sect. 4.3 and Appendix B).
+More details can be found in the paper (Sect. 5.1 and Appendix B).
 
 ## Run with Docker
 
-We built Docker images from the Tamarin
-[official repository](https://github.com/tamarin-prover/tamarin-prover). We used the
+We built Docker images from the Tamarin [official
+repository](https://github.com/tamarin-prover/tamarin-prover). We used the
 official Dockerfile found under `etc/docker`. We only slightly modified the
 Dockerfile to install Python, in order to run the oracles.
 
 The Docker images are publicly available at `selfrevocation/tamarin`. Different
 tags use different Tamarin versions:
 - `latest` (or `v1.7.1`) was built from commit
-  `ba7f2b8b259c3808441b093b4fff039430753332`. This version was originally used
-  to prove the models before the first submission.
+  `ba7f2b8b259c3808441b093b4fff039430753332`.
 - `v1.6.1` was built from tag `1.6.1`, which corresponds to the latest official
-  Tamarin release. This version was recently used to verify the models
-  (successfully).
+  Tamarin release.
 
 We provide a Makefile with targets to prove the two models using Docker.
 
 ### Run
 
 The target `prove` is used to run Tamarin in the background. The model to prove
-can be chosen by overriding the `MODEL` variable, indicating either `sol1`
-(default) or `sol2`. The first model is more computationally expensive: it may
-take around one hour and use ~5-10 GB of memory. The second model is quite fast
-to verify, taking only a couple of minutes.
+can be chosen by overriding the `MODEL` variable, indicating either
+`centralized-time` (default) or `distributed-time`. Both models should be quite
+fast to verify, taking a few minutes.
 
 An example on how to verify the second model is provided below:
 
 ```bash
 ### Run container ###
 # A container will start in the background.
-make prove MODEL=sol2
+make prove MODEL=centralized-time
 
 ### Check state of container ###
 # Check if container is still running
@@ -74,7 +73,7 @@ Example:
 ```bash
 ### Run container ###
 # A container will start in the background.
-make interactive MODEL=sol2
+make interactive MODEL=centralized-time
 
 # The Tamarin interactive webapp will be available at localhost:3001
 

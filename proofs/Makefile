@@ -1,7 +1,7 @@
 IMAGE           ?= selfrevocation/tamarin
 VERSION         ?= v1.6.1
 NAME            ?= tamarin
-MODEL           ?= sol1
+MODEL           ?= centralized-time
 THREADS         ?= $(shell nproc)
 
 ENV              = -e LC_ALL=C.UTF-8

@@ -1,4 +1,4 @@
-theory RevocationSolution1
+theory RevocationDistributedTime
 begin
 
 builtins: signing, multiset
@@ -8,6 +8,7 @@ builtins: signing, multiset
  */
 predicates:
     LessThan(x,y) <=> Ex z . x + z = y
+  , LessEqualThan(x,y) <=> x = y | Ex z . x + z = y
   , GreaterThan(x,y) <=> Ex z . x = y + z
   , GreaterEqualThan(x,y) <=> x = y | Ex z . x = y + z
   , IsNotInList(x,y) <=> 
@@ -51,10 +52,10 @@ restriction IsNotInList:
         & (not Ex c d . c + x + d = y)
     "
 
-restriction IsValidPseudonym:
+restriction IsNotRevoked:
     "
-    All ps #i . IsValidPseudonym(ps)@i ==> 
-        not (Ex c2 #k . PseudonymRevoked(ps, c2)@k & k<i)
+    All #i . IsNotRevoked()@i ==> 
+        not (Ex t #j . Revoked(t)@j & j<i)
     "
 
 restriction IsLatestTime:
@@ -82,15 +83,12 @@ restriction IsLatestTimeout:
 restriction HasTimeoutNotExpired:
     "
     All t tout #i . HasTimeoutNotExpired(t, tout)@i ==>
-        LessThan(t, tout)
+        LessEqualThan(t, tout)
     "
 
-/* Parameters
+/* Parameter Tv: gives a validity period on V2V messages and heartbeats
  *
- * Tv: gives a validity period on V2V messages and heartbeats
- * Tr: revocation timeout.
- *
- * These parameters are modeled to have a non-deterministic value.
+ * This parameters is modeled to have a non-deterministic value.
  */
 
  rule init_parameters:
@@ -102,7 +100,6 @@ restriction HasTimeoutNotExpired:
     ]->
     [
         TvTmp('1')
-      , TrTmp('1')
     ]
 
 rule increment_Tv:
@@ -114,16 +111,6 @@ rule increment_Tv:
     [
         TvTmp(tv + '1')
     ]
-
-rule increment_Tr:
-  [
-        TrTmp(tr)
-  ]
-  --[ 
-  ]->
-  [
-        TrTmp(tr + '1')
-  ]
 
 /* 
  * This rule initializes our system, creating the necessary facts 
@@ -138,24 +125,23 @@ rule Init:
           Fr(~ps_key)
         , Fr(~ltk)
         , TvTmp(tv)
-        , TrTmp(tr)
       ]
       --[ 
           /* restrictions */
           OnlyOnce('Init')
           /* action facts */
-        , SystemInitialized(tv, tr)
+        , SystemInitialized(tv)
         , TimeIncrement(t)
         , PseudonymGenerated(ps, t)
-        , NewTimeout(t + tr)
+        , NewTimeout(t + tv)
         , PRLUpdated(prl, '1')
       ]->
       [
-          !Parameters(tv, tr)
+          !Parameters(tv)
         , !Time(t)
         , !Pseudonym(ps)
         , !Ltk(ps, ~ps_key)
-        , !Timeout(t + tr)
+        , !Timeout(t + tv)
         , !Ltk('RA', ~ltk)
         , !Pk('RA', pk(~ltk))
         , !PRL(prl, '1')
@@ -176,7 +162,7 @@ rule process_message:
     in
         [
           In(<msg, signature>)
-        , !Parameters(tv, tr)
+        , !Parameters(tv)
         , !Pseudonym(ps)
         , !Time(t)
         ]
@@ -229,7 +215,7 @@ rule TC_sign_message:
         --[ 
           /* restrictions */
           // pseudonym check
-          IsValidPseudonym(ps)
+          IsNotRevoked()
         , IsLatestTime(t)
         , IsLatestTimeout(tout)
           // timeout check
@@ -248,14 +234,14 @@ rule TC_sign_message:
  * The TC processes the heartbeat iff the timeout has not yet expired, the
  * heartbeat has a valid signature and is not too old.
  *
- * If all checks succeed, the TC updates its timeout to `t + tr`.
+ * If all checks succeed, the TC creates a new timeout `t_hb + tv`.
  */
 rule TC_process_heartbeat_no_revoke:
     let HB = <prl, t_hb>
     in
         [   
             !Time(t)
-          , !Parameters(tv, tr)
+          , !Parameters(tv)
           , !Pseudonym(ps)
           , !Timeout(tout)
           , !Pk('RA', pkRA)
@@ -263,7 +249,8 @@ rule TC_process_heartbeat_no_revoke:
         ]
         --[ 
             /* restrictions */
-            IsLatestTimeout(tout)
+            IsNotRevoked()
+          , IsLatestTimeout(tout)
           , IsLatestTime(t)
             // timeout check
           , HasTimeoutNotExpired(t, tout)
@@ -275,10 +262,10 @@ rule TC_process_heartbeat_no_revoke:
           , IsNotInList(ps, prl)
             /* action facts */
           , HeartbeatProcessed(HB, t)
-          , NewTimeout(t + tr)
+          , NewTimeout(t_hb + tv)
         ]->
         [
-            !Timeout(t + tr)
+            !Timeout(t_hb + tv)
         ]
 
 /*
@@ -289,15 +276,14 @@ rule TC_process_heartbeat_no_revoke:
  * The TC processes the heartbeat iff the timeout has not yet expired, the
  * heartbeat has a valid signature and is not too old.
  *
- * If all checks succeed, the TC revokes `ps` and updates its timeout to 
- * `t + tr`.
+ * If all checks succeed, the TC creates a new timeout `t_hb + tv`.
  */
 rule TC_process_heartbeat_revoke:
     let HB = <prl, t_hb>
     in
         [   
             !Time(t)
-          , !Parameters(tv, tr)
+          , !Parameters(tv)
           , !Pseudonym(ps)
           , !Timeout(tout)
           , !Pk('RA', pkRA)
@@ -305,7 +291,8 @@ rule TC_process_heartbeat_revoke:
         ]
         --[ 
             /* restrictions */
-            IsLatestTimeout(tout)
+            IsNotRevoked()
+          , IsLatestTimeout(tout)
           , IsLatestTime(t)
             // timeout check
           , HasTimeoutNotExpired(t, tout)
@@ -317,11 +304,11 @@ rule TC_process_heartbeat_revoke:
           , IsInList(ps, prl)
             /* action facts */
           , HeartbeatProcessed(HB, t)
-          , PseudonymRevoked(ps, t)
-          , NewTimeout(t + tr)
+          , NewTimeout(t_hb + tv)
+          , Revoked(t)
         ]->
         [
-            !Timeout(t + tr)
+            !Timeout(t_hb + tv)
         ]
 
 /*
@@ -339,7 +326,8 @@ rule TC_do_operation:
     ]
     --[ 
         /* restrictions */
-          IsLatestTimeout(tout)
+          IsNotRevoked()
+        , IsLatestTimeout(tout)
         , IsLatestTime(t)
         // timeout check
         , HasTimeoutNotExpired(t, tout)
@@ -442,7 +430,7 @@ lemma process_hb_possible [heuristic=I]: exists-trace
  */
 lemma revocation_possible [heuristic=I]: exists-trace
     "
-    Ex ps t #i . PseudonymRevoked(ps, t)@i
+    Ex t #i . Revoked(t)@i
     "
 
 /* 
@@ -455,28 +443,17 @@ lemma process_message_possible [heuristic=I]: exists-trace
     "
 
 /* 
- * The following lemmas ensure that the parameters are non-deterministic.
+ * The following lemmas ensure that parameter tv is non-deterministic.
  */
-
-lemma exists_par_tr_5 [heuristic=I]: exists-trace
-    "
-    Ex tv tr #i . SystemInitialized(tv, tr)@i & tr = '1'+'1'+'1'+'1'+'1'
-    "
-
-lemma exists_par_tr_8 [heuristic=I]: exists-trace
-    "
-    Ex tv tr #i . SystemInitialized(tv, tr)@i 
-      & tr = '1'+'1'+'1'+'1'+'1'+'1'+'1'+'1'
-    "
 
 lemma exists_par_tv_2 [heuristic=I]: exists-trace
     "
-    Ex tv tr #i . SystemInitialized(tv, tr)@i & tv = '1'+'1'
+    Ex tv #i . SystemInitialized(tv)@i & tv = '1'+'1'
     "
 
 lemma exists_par_tv_4 [heuristic=I]: exists-trace
     "
-    Ex tv tr #i . SystemInitialized(tv, tr)@i & tv = '1'+'1'+'1'+'1'
+    Ex tv #i . SystemInitialized(tv)@i & tv = '1'+'1'+'1'+'1'
     "
 
 /*
@@ -486,17 +463,17 @@ lemma exists_par_tv_4 [heuristic=I]: exists-trace
 lemma no_signing_after_timeout [heuristic=I]:
     "
     All m t ps #i . Signed(<m, t>, ps)@i ==>
-        Ex t2 #j . NewTimeout(t2)@j & j<i & LessThan(t, t2)
+        Ex t2 #j . NewTimeout(t2)@j & j<i & LessEqualThan(t, t2)
     "
 
 /*
  * This lemma checks that no signatures can be made by the TC after revoking
  * `ps` (self-revocation).
  */
-lemma no_signing_after_revoking_pseudonym [heuristic=I]:
+lemma no_signing_after_revocation [heuristic=I]:
     "
     All msg ps #i . Signed(msg, ps)@i ==>
-       not (Ex t2 #j . PseudonymRevoked(ps, t2)@j & j<i)
+       not (Ex t2 #j . Revoked(t2)@j & j<i)
     "
 
 /*
@@ -506,7 +483,7 @@ lemma no_signing_after_revoking_pseudonym [heuristic=I]:
 lemma all_heartbeats_processed_within_tolerance [heuristic=o "oracle.py"]:
     "
     All prl t_hb t #i . HeartbeatProcessed(<prl, t_hb>, t)@i ==>
-        Ex tv tr #j . SystemInitialized(tv, tr)@j & j<i
+        Ex tv #j . SystemInitialized(tv)@j & j<i
         &
         GreaterEqualThan(t_hb + tv, t)
     "
@@ -532,27 +509,9 @@ lemma all_messages_accepted_signed_exists [reuse, heuristic=o "oracle.py"]:
 lemma all_messages_accepted_within_tolerance [reuse, heuristic=o "oracle.py"]:
     "
     All m t_v2v ps t #i . MessageAccepted(<m, t_v2v>, ps, t)@i ==> 
-        Ex tv tr #j . SystemInitialized(tv, tr)@j & j<i
+        Ex tv #j . SystemInitialized(tv)@j & j<i
         &
         GreaterEqualThan(t_v2v + tv, t)
-    "
-
-/* 
- * This lemma checks that all signatures made with `ps` happen within the worst
- * case time t_sign = t_rev + tv + tr, as described in the paper.
- *
- * Marked as reuse to prove property (I).
- */
-lemma all_signatures_before_timeout [reuse, heuristic=o "oracle.py"]:
-    "
-    All m t ps #i . Signed(<m, t>, ps)@i ==> 
-        Ex tv tr #j . SystemInitialized(tv, tr)@j & j<i
-        &
-        not (
-          Ex t_rev #k . RevocationIssued(ps, t_rev)@k 
-            & k<i 
-            & GreaterEqualThan(t, t_rev + tv + tr)
-        )
     "
 
 /*
@@ -565,12 +524,12 @@ lemma all_signatures_before_timeout [reuse, heuristic=o "oracle.py"]:
 lemma no_messages_accepted_with_timestamp_t_sign [reuse, heuristic=o "oracle.py"]:
     "
     All m t_v2v ps t #i . MessageAccepted(<m, t_v2v>, ps, t)@i ==> 
-        Ex tv tr #j . SystemInitialized(tv, tr)@j & j<i
+        Ex tv #j . SystemInitialized(tv)@j & j<i
         &
         not (
           Ex t_rev #k . RevocationIssued(ps, t_rev)@k 
             & k<i 
-            & GreaterEqualThan(t_v2v, t_rev + tv + tr)
+            & GreaterThan(t_v2v, t_rev + tv)
         )
     "
 
@@ -579,24 +538,24 @@ lemma no_messages_accepted_with_timestamp_t_sign [reuse, heuristic=o "oracle.py"
  *
  * If `ps` is revoked by the RA at time t_rev, a 3rd party entity will not 
  * process any more V2V messages coming from that TC starting from 
- * t_eff == t_rev + 2tv + tr.
+ * t_eff == t_rev + 2tv.
  *
  * This combines lemmas `all_signatures_before_t` and 
  * `no_messages_accepted_with_timestamp_t`
  *
  * This in Tamarin is translated to the following lemma: "it does not exist
  * a state where a `RevocationIssued` fact is generated at time t_rev and a
- * `MessageAccepted` fact is generated at a time >= t_rev + tv + tr + tv".
+ * `MessageAccepted` fact is generated at a time >= t_rev + tv + tv".
  */
 lemma effective_revocation [heuristic=o "oracle.py"]:
     "
     All msg ps t #i . MessageAccepted(msg, ps, t)@i ==> 
-        Ex tv tr #j . SystemInitialized(tv, tr)@j & j<i
+        Ex tv #j . SystemInitialized(tv)@j & j<i
         &
         not (
           Ex t_rev #k . RevocationIssued(ps, t_rev)@k 
             & k<i 
-            & GreaterEqualThan(t, t_rev + tv + tr + tv)
+            & GreaterThan(t, t_rev + tv + tv)
         )
     "
 
@@ -604,30 +563,24 @@ lemma effective_revocation [heuristic=o "oracle.py"]:
  * Property (II): "time in PRL"
  *
  * If `ps` is revoked by the RA at time t_rev but the TC does not self-revoke it,
- * the TC will be in an auto-revoked state starting from t_prl == t_rev + tv + tr.
+ * the TC will be in an auto-revoked state starting from t_prl == t_rev + tv.
  * This proves that `ps` can be safely removed from the PRL starting from T_prl.
  *
  * This in Tamarin is translated to the following lemma: "it does not exist
  * a state where a `RevocationIssued` fact is generated at time t_rev and a
- * `NewOperation` fact is generated at a time >= t_rev + tv + tr, unless the TC
- * has successfully self-revoked `ps` before generating `NewOperation`".
+ * `NewOperation` fact is generated at a time >= t_rev + tv".
  */
 lemma no_operations_after_timeout [heuristic=o "oracle.py"]:
     "
     // for all operations done by the TC
     All t #i . NewOperation(t)@i ==> 
-        Ex tv tr #j . SystemInitialized(tv, tr)@j & j<i
+        Ex tv #j . SystemInitialized(tv)@j & j<i
         &
-        (
-        // either this operation was done before t_rev + tv + tr
+        // this operation was done not after t_rev + tv
         not (
           Ex ps t_rev #k . RevocationIssued(ps, t_rev)@k
             & k<i 
-            & GreaterEqualThan(t, t_rev + tv + tr)
-        )
-        |
-        // or the pseudonym was already revoked before
-        (Ex ps t2 #k . PseudonymRevoked(ps, t2)@k & k<i)
+            & GreaterThan(t, t_rev + tv)
         )
     "
 end
