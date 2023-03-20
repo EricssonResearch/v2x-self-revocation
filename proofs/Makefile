@@ -2,7 +2,7 @@ IMAGE           ?= selfrevocation/tamarin
 VERSION         ?= v1.6.1
 NAME            ?= tamarin
 MODEL           ?= centralized-time
-THREADS         ?= $(shell nproc)
+THREADS         ?= 8 #$(shell nproc)
 
 ENV              = -e LC_ALL=C.UTF-8
 VOLUME           = $(shell cd $(MODEL); pwd)
