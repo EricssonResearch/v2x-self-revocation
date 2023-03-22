@@ -1,5 +1,6 @@
 # Efficient and Timely Revocation of V2X Credentials
-This repository contains the software artifacts for the paper.
+This repository contains software artifacts and an [appendix](appendix.pdf) that
+gives more insights on the paper.
 
 The repository is structured into three parts:
 ```text
