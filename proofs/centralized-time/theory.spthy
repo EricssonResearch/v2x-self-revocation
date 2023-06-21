@@ -32,29 +32,23 @@ restriction OnlyOnce:
 
 restriction GreaterEqualThan:
     "All x y #i . GreaterEqualThan(x,y)@i ==> x = y | Ex z . x = y + z"
-    
-restriction IsInList:
-    "
-    All x y #i . IsInList(x, y)@i ==>
-        x = y
-        | (Ex a . a + x = y)
-        | (Ex b . x + b = y)
-        | (Ex c d . c + x + d = y)
-    "
-
-restriction IsNotInList:
-    "
-    All x y #i . IsNotInList(x, y)@i ==> 
-        not x = y
-        & (not Ex a . a + x = y)
-        & (not Ex b . x + b = y)
-        & (not Ex c d . c + x + d = y)
-    "
 
 restriction IsNotRevoked:
     "
     All #i . IsNotRevoked()@i ==> 
         not (Ex t #j . Revoked(t)@j & j<i)
+    "
+
+restriction ShouldRevoke:
+    "
+    All prl #i . ShouldRevoke(prl)@i ==> 
+        Ex ps #j . NewPseudonym(ps)@j & j<i & IsInList(ps, prl)
+    "
+
+restriction ShouldNotRevoke:
+    "
+    All prl #i . ShouldNotRevoke(prl)@i ==> 
+        not (Ex ps #j . NewPseudonym(ps)@j & j<i & IsInList(ps, prl))
     "
 
 restriction IsLatestTime:
@@ -69,12 +63,12 @@ restriction IsLatestPRL:
         not (Ex prl cnt2 #j . PRLUpdated(prl, cnt2)@j & j<i & GreaterThan(cnt2, cnt))
     "
 
-/* 
- * Parameter t_v: gives a validity period on V2V messages and heartbeats.
- * This parameter is modeled to have a non-deterministic value.
- */
 
- rule init_parameters:
+/* Parameter `tv`: gives a validity period on V2V messages and heartbeats
+ *
+ * This parameters is modeled to have a non-deterministic value.
+ */
+rule init_parameters:
     [
     ]
     --[ 
@@ -102,11 +96,9 @@ rule increment_Tv:
 rule Init:
   let t = '1'
       prl = '0'
-      ps = pk(~ps_key)
   in
       [   
-          Fr(~ps_key)
-        , Fr(~ltk)
+          Fr(~ltk)
         , TvTmp(tv)
       ]
       --[ 
@@ -122,14 +114,11 @@ rule Init:
           !Time('TC', t)
         , !Time('RA', t)
         , !Parameters(tv)
-        , !Pseudonym(ps)
-        , !Ltk(ps, ~ps_key)
         , !Ltk('RA', ~ltk)
         , !Pk('RA', pk(~ltk))
         , !PRL(prl, '1')
         // public stuff
         , Out(pk(~ltk))
-        , Out(ps)
       ]
 
 /* 
@@ -159,13 +148,43 @@ rule process_message:
         , MessageAccepted(msg, ps, t)
         ]->
         [
-        ]    
+        ]   
+
+/*
+ * This rule allows the TC to obtain a new pseudonym credential. We do not
+ * model how this pseudonym is obtained, as it is outside of our scope. What
+ * is important in our model is the end result, i.e., that the TC gets a new
+ * pseudonym.
+ *
+ * The TC can obtain a new pseudonym iff it is not yet revoked. This rule can
+ * be executed an arbitrary number of times, hence we model the TC in such a way
+ * that it can use an arbitrary number of pseudonyms.
+ */
+rule TC_get_pseudonym:
+    let ps = pk(~ps_key)
+    in
+        [   
+          !Time('TC', t)
+        , Fr(~ps_key)
+        ]
+        --[ 
+          /* restrictions */
+          IsNotRevoked()
+        , IsLatestTime('TC', t)
+          /* action facts */
+        , NewPseudonym(ps)
+        ]->
+        [
+          Out(ps)
+        , !Pseudonym(ps)
+        , !Ltk(ps, ~ps_key)
+        ] 
 
 /*
  * This rule allows the TC to generate a new V2V message.
  * The content of the message is not important and we model it as a fresh value.
  *
- * The TC signs the message iff the pseudonym is still valid.
+ * The TC signs the message iff the TC is not revoked.
  */
 rule TC_sign_message:
     let msg = <~m, t>
@@ -189,11 +208,13 @@ rule TC_sign_message:
 
 /*
  * This rule allows the TC to process a heartbeat received from the channel.
- * This is the variant where the PRL does not include the pseudonym `ps`.
+ * This is the variant where the TC does not get revoked, i.e., when the PRL 
+ * does not contain *any* of the pseudonyms owned by the TC
  *
- * The TC processes the heartbeat iff the heartbeat has a valid signature and 
- * its time is >= the one stored in the TC, up to an upper bound given by the
- * tolerance `tv`.
+ * The TC processes the heartbeat iff the timeout has not yet expired, the
+ * heartbeat has a valid signature and is not too old (according to parameter 
+ * `tv`). Besides, the rule also checks that the HB is not "too new", which is
+ * a condition for triggering automatic revocation (see the paper for more info)
  *
  * If all checks succeed, the TC advances to time `t_hb`
  */
@@ -203,7 +224,6 @@ rule TC_process_heartbeat_no_revoke:
         [   
             !Time('TC', t)
           , !Parameters(tv)
-          , !Pseudonym(ps)
           , !Pk('RA', pkRA)
           , In(<HB, signature>)
         ]
@@ -216,10 +236,10 @@ rule TC_process_heartbeat_no_revoke:
             // tolerance checks
           , GreaterEqualThan(t_hb + tv, t)
           , GreaterEqualThan(t + tv, t_hb)
-            // pseudonyms must not be in list
-          , IsNotInList(ps, prl)
+            // pseudonyms must not be in PRL
+          , ShouldNotRevoke(prl)
             /* action facts */
-          , HeartbeatProcessed(HB)
+          , HeartbeatProcessed(HB, t)
           , NewTime('TC', t_hb)
         ]->
         [
@@ -228,13 +248,15 @@ rule TC_process_heartbeat_no_revoke:
 
 /*
  * This rule allows the TC to process a heartbeat received from the channel.
- * This is the variant where the PRL includes the pseudonym `ps`.
+ * This is the variant where the TC does not get revoked, i.e., when the PRL 
+ * contains *at least* one of the pseudonyms owned by the TC
  *
- * The TC processes the heartbeat iff the heartbeat has a valid signature and 
- * its time is >= the one stored in the TC, up to an upper bound given by the
- * tolerance `tv`.
+ * The TC processes the heartbeat iff the timeout has not yet expired, the
+ * heartbeat has a valid signature and is not too old (according to parameter 
+ * `tv`). Besides, the rule also checks that the HB is not "too new", which is
+ * a condition for triggering automatic revocation (see the paper for more info)
  *
- * If all checks succeed, the TC revokes `ps` and advances to time `t_hb`.
+ * If all checks succeed, the TC advances to time `t_hb`
  */
 rule TC_process_heartbeat_revoke:
     let HB = <prl, t_hb>
@@ -242,7 +264,6 @@ rule TC_process_heartbeat_revoke:
         [   
             !Time('TC', t)
           , !Parameters(tv)
-          , !Pseudonym(ps)
           , !Pk('RA', pkRA)
           , In(<HB, signature>)
         ]
@@ -255,10 +276,10 @@ rule TC_process_heartbeat_revoke:
             // tolerance checks
           , GreaterEqualThan(t_hb + tv, t)
           , GreaterEqualThan(t + tv, t_hb)
-            // pseudonyms must be in list
-          , IsInList(ps, prl)
+            // at least one pseudonym should be in list
+          , ShouldRevoke(prl)
             /* action facts */
-          , HeartbeatProcessed(HB)
+          , HeartbeatProcessed(HB, t)
           , NewTime('TC', t_hb)
           , Revoked(t)
         ]->
@@ -268,7 +289,7 @@ rule TC_process_heartbeat_revoke:
     
 /*
  * This rule allows the RA to generate a new heartbeat. The heartbeat will
- * include the latest PRL and time available.
+ * include the latest PRL and timestamp.
  *
  * This rule is called once per heartbeat, i.e., we do not generate the same
  * heartbeat multiple times. In any case, the network channel is modeled such
@@ -323,7 +344,7 @@ rule RA_issue_revocation:
     ]
 
 /*
- * This rule is used to advance the RA's current time by 1.
+ * This rule is used to advance the RA's current time by 1 step.
  */
 rule RA_advance_time:
     [
@@ -356,7 +377,7 @@ lemma generate_hb_possible [heuristic=I]: exists-trace
     "
 
 /* 
- * this lemma checks if the RA can revoke `ps`. 
+ * this lemma checks if the RA can revoke a pseudonym `ps`. 
  */
 lemma issue_revocation_possible [heuristic=I]: exists-trace
     "
@@ -368,11 +389,11 @@ lemma issue_revocation_possible [heuristic=I]: exists-trace
  */
 lemma processing_hb_possible [heuristic=o "oracle.py"]: exists-trace
     "
-    Ex hb #i . HeartbeatProcessed(hb)@i
+    Ex hb t #i . HeartbeatProcessed(hb, t)@i
     "
 
 /* 
- * this lemma checks if the TC can self-revoke `ps`. 
+ * this lemma checks if the TC can self-revoke itself (self-revocation). 
  */
 lemma revocation_possible [heuristic=o "oracle.py"]: exists-trace
     "
@@ -412,29 +433,41 @@ lemma no_signing_after_revocation [heuristic=I]:
        not (Ex t2 #j . Revoked(t2)@j & j<i)
     "
 
+/*
+ * This lemma checks that no old heartbeats (i.e., according to the
+ * timestamp and parameter `tv`) are processed by the TC.
+ */
+lemma all_heartbeats_processed_within_tolerance [heuristic=o "oracle.py"]:
+    "
+    All prl t_hb t #i . HeartbeatProcessed(<prl, t_hb>, t)@i ==>
+        Ex tv #j . SystemInitialized(tv)@j & j<i
+        &
+        GreaterEqualThan(t_hb + tv, t)
+    "
+  
 /* 
  * This lemma ensures that, after revocation of `ps`, all signatures made with
- * `ps` cannot have an time bigger than t_rev
+ * `ps` cannot have an time bigger than `t_rev`
  */
 lemma all_signatures_max_time_t_rev [heuristic=o "oracle.py"]:
     "
     All m ps t #i . Signed(<m, t>, ps)@i ==>
         not (
-          Ex t_rev #j . RevocationIssued(ps, t_rev)@j 
+          Ex ps2 t_rev #j . RevocationIssued(ps2, t_rev)@j 
             & GreaterThan(t, t_rev)
         )
     "
 
 /* 
- * Property (I): "effective revocation"
+ * Property (i): "effective revocation"
  *
- * If `ps` is revoked by the RA at time t_rev, a 3rd party entity will not 
- * process any more V2V messages coming from that TC starting from 
- * time == t_rev + tv + 1.
+ * If the TC is revoked by the RA at time `t_rev`, a 3rd party entity will not 
+ * process any more V2V messages coming from that TC when its internal time
+ * reaches `t == t_rev + tv + 1`
  *
  * This in Tamarin is translated to the following lemma: "it does not exist
- * a state where a `RevocationIssued` fact is generated at time t_rev and a
- * `MessageAccepted` fact is generated at time > t_rev + tv".
+ * a state where a `RevocationIssued` fact is generated at time `t_rev` and a
+ * `MessageAccepted` fact is generated at time `t > t_rev + tv`".
  */
 lemma effective_revocation [heuristic=o "oracle.py"]:
     "
@@ -442,32 +475,29 @@ lemma effective_revocation [heuristic=o "oracle.py"]:
         Ex tv #j . SystemInitialized(tv)@j & j<i
         &
         not (
-          Ex t_rev #k . RevocationIssued(ps, t_rev)@k 
+          Ex ps2 t_rev #k . RevocationIssued(ps2, t_rev)@k 
             & GreaterThan(t, t_rev + tv)
         ) 
     "
   
 /* 
- * Property (II): "time in PRL"
+ * Property (ii): "time in PRL"
  *
- * If `ps` is revoked by the RA at time t_rev but the TC does not self-revoke it,
- * the TC will auto-revoke all credentials if it processes any HB or V2V message
- * containing time > t_rev + tv.
- * This proves that `ps` can be safely removed from the PRL as soon as the RA's
- * time reaches t_rev + tv + 1.
+ * If the TC is revoked by the RA at time `t_rev`, the TC will execute automatic
+ * revocation if it processes any HB containing time `t_hb > t_rev + tv`.
+ * This proves that the TC pseudonyms can be safely removed from the PRL as soon
+ * as the RA's time reaches t_rev + tv + 1.
  *
  * This in Tamarin is translated to the following lemma: "it does not exist
- * a state where a `RevocationIssued` fact is generated at time t_rev and a
+ * a state where a `RevocationIssued` fact is generated at time `t_rev` and a
  * `HeartbeatProcessed` fact is generated for a heartbeat containing 
- * time > t_rev + tv.
+ * time  `t_hb > t_rev + tv`.
  */
 lemma no_heartbeats_processed_after_tolerance [heuristic=o "oracle.py"]:
     "
-    // for all heartbeats processed
-    All prl t_hb #i . HeartbeatProcessed(<prl, t_hb>)@i ==>
+    All prl t_hb t #i . HeartbeatProcessed(<prl, t_hb>, t)@i ==>
         Ex tv #j . SystemInitialized(tv)@j & j<i
         &
-        // t_hb is <= t_rev + tv
         not (
           Ex ps t_rev #k . RevocationIssued(ps, t_rev)@k
             & k<i

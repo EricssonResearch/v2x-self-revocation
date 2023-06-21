@@ -7,100 +7,119 @@ lemma = sys.argv[1]
 
 goals = {}
 
+def add_goal(ranking, goal):
+  if ranking not in goals:
+    goals[ranking] = []
+
+  goals[ranking].append(goal)    
+
 for line in lines:
   num = line.split(':')[0]
 
   if lemma in [
-      "all_signatures_before_timeout"
-    , "no_messages_accepted_with_timestamp_t_sign"
-    , "no_operations_after_timeout"
-    , "all_messages_accepted_signed_exists"
+      "no_messages_accepted_after_revocation"
+  ]:
+    if "!KU( ~ltk" in line:
+      add_goal(0, num)
+    if "(#k < #vr.4))" in line:
+      add_goal(1, num)
+    if "tout" not in line and (
+      ("('1'+t_rev+z+z.1)" in line and "('1'+'1'+t.1)" in line) or
+      ("('1'+t_rev+tv+z+z.1)" in line and "('1'+'1'+tv+t.1)" in line)
+    ):
+      add_goal(2, num)
+    elif "!Time( ('1'+t_rev+z)" in line or "!Time( ('1'+t_rev+tv+z)" in line:
+      add_goal(3, num)
+    elif "!KU( sign(<prl.1, t_hb>, ~ltk)" in line:
+      add_goal(4, num)    
+    elif "!Parameters( tv.1 )" in line:
+      add_goal(5, num)  
+    elif "!Timeout( tout )" in line:
+      add_goal(6, num)
+    else:
+      add_goal(100, num)
+
+  elif lemma in [
+        "no_operations_after_timeout"
+    ]:
+    if "!KU( ~ltk" in line:
+      add_goal(0, num)
+    if "(#vr.7 < #k)" in line:
+      add_goal(1, num)
+    if "(#vr.6 < #k)" in line:
+      add_goal(2, num)
+    elif "!KU( sign(<prl, t_hb>, ~ltk)" in line:
+      add_goal(3, num)
+    elif "!Time( ('1'+t_rev+z)" in line or "!Time( ('1'+t_rev+tv+z)" in line:
+      add_goal(4, num)
+    if "(('1'+t_rev+z)" in line or "(('1'+t_rev+tv+z)" in line:
+      add_goal(5, num)
+    elif "!Timeout" in line:
+      add_goal(6, num)
+    else:
+      add_goal(100, num)
+
+  elif lemma in [
+      "all_messages_accepted_signed_exists"
   ]:
     # easy goals
-    if "!KU( ~ltk" in line:
-      goals.setdefault(0, num)
-    elif "!KU( ~ps_key" in line:
-      goals.setdefault(1, num)
-    elif "!Pseudonym" in line:
-      goals.setdefault(2, num)
-    elif "!Pk" in line:
-      goals.setdefault(3, num)
-    elif "!Ltk" in line:
-      goals.setdefault(4, num)
-    elif "!PRL(" in line:
-      goals.setdefault(5, num)
+    if "!KU( ~ltk" in line or "!KU( ~ps_key" in line:
+      add_goal(0, num)
     elif "!Parameters" in line:
-      goals.setdefault(6, num)
+      add_goal(1, num)     
+    elif "!Pseudonym( pk(x)" in line:
+      add_goal(2, num) 
     elif "!KU( sign" in line:
-      goals.setdefault(7, num)
-
-    # constraints
-    elif "!Time" in line and not "!Timeout" in line and "'1'" in line:
-      goals.setdefault(39, num)     
-    elif line.count("#vr.") >= 4:
-      goals.setdefault(40, num)
-    elif "#vr." in line and ("#j" in line or "#k" in line):
-      goals.setdefault(41, num)
-    elif "!Time" not in line and "('1'+t_rev" in line:
-      goals.setdefault(42, num)
-    elif "!Time" not in line and "Tmp" not in line:
-      goals.setdefault(99 - line.count("'1'"), num)
-
-    # hard goals
-    elif "!KU(" in line:
-      goals.setdefault(900, num)
-    elif "!Timeout" in line:
-      goals.setdefault(1000, num)
-    elif "t = tout" in line:
-      goals.setdefault(1500, num)
-    elif "!Time" in line:
-      goals.setdefault(2000, num)
-    elif "TvTmp" in line:
-      goals.setdefault(20000, num)
+      add_goal(3, num)
     else:
-      goals.setdefault(100, num)
+      add_goal(100, num)
 
   elif lemma in [
       "all_messages_accepted_within_tolerance"
     , "all_heartbeats_processed_within_tolerance"
   ]:
     # easy goals
-    if "!Pseudonym" in line:
-      goals.setdefault(2, num)
+    if "!KU( ~ltk" in line or "!KU( ~ps_key" in line:
+      add_goal(0, num)
+    elif "!Pseudonym(" in line and ("pk(~ps_key)" in line or "pk(~ltk)" in line):
+      add_goal(1, num)
     elif "!Ltk" in line:
-      goals.setdefault(4, num)
+      add_goal(4, num)
     elif "!Parameters" in line:
-      goals.setdefault(6, num)
+      add_goal(6, num)
 
     # hard goals
     elif "!KU(" in line:
-      goals.setdefault(900, num)
+      add_goal(900, num)
     elif "!Pk" in line:
-      goals.setdefault(901, num)
+      add_goal(901, num)
+    if "!Pseudonym" in line:
+      add_goal(902, num)
     elif "!PRL(" in line:
-      goals.setdefault(902, num)
+      add_goal(903, num)
     elif "!Timeout" in line:
-      goals.setdefault(1000, num)
+      add_goal(1000, num)
     elif "!Time" in line:
-      goals.setdefault(2000, num)
+      add_goal(2000, num)
     elif "TvTmp" in line:
-      goals.setdefault(20000, num)
+      add_goal(20000, num)
     else:
-      goals.setdefault(100, num)
+      add_goal(100, num)
 
   elif lemma in [
     "effective_revocation"
   ]:
-    if "t_rev+tv.1+tv.1" in line:
-      goals.setdefault(1, num)
+    if "((t_v2v+tv.1) = (t_rev+z+tv.1+tv.1))" in line:
+      add_goal(1, num)
     else:
-      goals.setdefault(900, num)
+      add_goal(900, num)
   else:
     exit(0)
 
-sorted_goals = sorted(goals.items(), key=lambda x : x[0])
+sorted_goals = sorted(goals.items(), key=lambda x : x)
 
-for _, index in sorted_goals:
-  print(index)
+for _, values in sorted_goals:
+  for v in values:
+    print(v)
 
 exit(0)

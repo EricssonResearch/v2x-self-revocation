@@ -3,23 +3,23 @@ summary of summaries:
 
 analyzed: theory.spthy
 
-  output:          out/tamarin-distributed-output.spthy
-  processing time: 245.146190409s
+  output:          out/distributed-time-output.spthy
+  processing time: 277.815325131s
   sign_possible (exists-trace): verified (6 steps)
   generate_hb_possible (exists-trace): verified (5 steps)
   issue_revocation_possible (exists-trace): verified (5 steps)
-  process_hb_possible (exists-trace): verified (10 steps)
-  revocation_possible (exists-trace): verified (12 steps)
+  processing_hb_possible (exists-trace): verified (9 steps)
+  revocation_possible (exists-trace): verified (13 steps)
   process_message_possible (exists-trace): verified (7 steps)
   exists_par_tv_2 (exists-trace): verified (5 steps)
   exists_par_tv_4 (exists-trace): verified (7 steps)
-  no_signing_after_timeout (all-traces): verified (53 steps)
+  no_signing_after_timeout (all-traces): verified (205 steps)
   no_signing_after_revocation (all-traces): verified (2 steps)
-  all_heartbeats_processed_within_tolerance (all-traces): verified (108 steps)
-  all_messages_accepted_signed_exists (all-traces): verified (18 steps)
-  all_messages_accepted_within_tolerance (all-traces): verified (58 steps)
-  no_messages_accepted_with_timestamp_t_sign (all-traces): verified (92 steps)
-  effective_revocation (all-traces): verified (80 steps)
-  no_operations_after_timeout (all-traces): verified (872 steps)
+  all_heartbeats_processed_within_tolerance (all-traces): verified (260 steps)
+  all_messages_accepted_signed_exists (all-traces): verified (62 steps)
+  all_messages_accepted_within_tolerance (all-traces): verified (282 steps)
+  no_messages_accepted_after_revocation (all-traces): verified (74 steps)
+  effective_revocation (all-traces): verified (4 steps)
+  no_operations_after_timeout (all-traces): verified (76 steps)
 
 ==============================================================================
