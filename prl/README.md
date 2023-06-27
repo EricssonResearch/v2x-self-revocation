@@ -18,7 +18,7 @@ To get started, simply install the dependencies in the `requirements.txt` file `
 ## Generating a single stationary distribution
 Run one iteration of the main script like this:
 ```bash
-python3 main.py -n 400 -p 0.0001 -e 300 --cache-dir=cached/ --force-cached -g
+python3 main.py -n 800 -p 0.0001 -e 30 --cache-dir=cached/ --force-cached -g
 ```
 `--help` gives more information but `n`, `p`, and `e` (T_prl) are defined as in the paper while `--cache-dir` defines the caching directory, `--force-cached` prevents recomputation and only relies on the data already in the `cached` folder, and `-g` instructs to plot the stationary distribution of these parameters.
 
@@ -50,8 +50,8 @@ Scenario 2: vehicles get revoked at least once a day with 99% probability
 
 Then multiple plots can be generated at the same time with the `generate_plots.py` script (careful, potentially only with python versions before 3.9 or 3.10).
 ```bash
-python3 generate_plots.py -e 270 -n 400 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489
-python3 generate_plots.py -e 270 -n 400 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 generate_plots.py -e 30 -n 800 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489
+python3 generate_plots.py -e 30 -n 800 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
 ```
 
 ## Reproducing the data used in the Tv plot
