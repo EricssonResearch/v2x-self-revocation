@@ -1,7 +1,6 @@
 % This file was created with tikzplotlib v0.10.1.
 \begin{tikzpicture}
 
-\definecolor{crimson2143940}{RGB}{214,39,40}
 \definecolor{darkgray176}{RGB}{176,176,176}
 \definecolor{darkorange25512714}{RGB}{255,127,14}
 \definecolor{forestgreen4416044}{RGB}{44,160,44}
@@ -20,61 +19,81 @@ legend style={
 },
 tick align=outside,
 tick pos=left,
+title={n800\_e30},
 x grid style={darkgray176},
-xmin=370, xmax=1030,
+xmin=-0.55, xmax=11.55,
 xtick style={color=black},
+xtick={0,1,2,3,4,5,6,7,8,9,10,11},
+xticklabel style={rotate=45.0},
+xticklabels={
+  Scenario 1 - 0\%,
+  Scenario 1 - 1\%,
+  Scenario 1 - 2\%,
+  Scenario 1 - 5\%,
+  Scenario 1 - 10\%,
+  Scenario 1 - 20\%,
+  Scenario 2 - 0\%,
+  Scenario 2 - 1\%,
+  Scenario 2 - 2\%,
+  Scenario 2 - 5\%,
+  Scenario 2 - 10\%,
+  Scenario 2 - 20\%
+},
 y grid style={darkgray176},
-ymin=-1.3, ymax=71.3,
+ymin=0.25, ymax=16.75,
 ytick style={color=black}
 ]
 \addplot [draw=steelblue31119180, fill=steelblue31119180, mark=*, only marks]
 table{%
 x  y
-400 2
-500 2
-600 2
-700 2
-800 2
-900 2
-1000 2
+0 1
+1 1
+2 2
+3 2
+4 4
+5 6
+6 3
+7 3
+8 3
+9 4
+10 5
+11 7
 };
-\addlegendentry{Scenario 1 - 0%}
+\addlegendentry{75th percentile}
 \addplot [draw=darkorange25512714, fill=darkorange25512714, mark=triangle*, only marks]
 table{%
 x  y
-400 27
-500 32
-600 37
-700 42
-800 46
-900 51
-1000 56
+0 1
+1 2
+2 2
+3 3
+4 5
+5 7
+6 4
+7 4
+8 4
+9 5
+10 6
+11 9
 };
-\addlegendentry{Scenario 1 - 20%}
+\addlegendentry{90th percentile}
 \addplot [draw=forestgreen4416044, fill=forestgreen4416044, mark=square*, only marks]
 table{%
 x  y
-400 13
-500 15
-600 17
-700 19
-800 21
-900 23
-1000 25
+0 2
+1 4
+2 5
+3 7
+4 10
+5 14
+6 8
+7 9
+8 9
+9 10
+10 12
+11 16
 };
-\addlegendentry{Scenario 2 - 0%}
-\addplot [draw=crimson2143940, fill=crimson2143940, mark=diamond*, only marks]
-table{%
-x  y
-400 32
-500 38
-600 44
-700 50
-800 56
-900 62
-1000 68
-};
-\addlegendentry{Scenario 2 - 20%}
+\addlegendentry{99.99th percentile}
 \end{axis}
 
 \end{tikzpicture}

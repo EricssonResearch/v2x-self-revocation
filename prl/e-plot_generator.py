@@ -45,13 +45,13 @@ def main(
     n_stop = 1000
     n_step = 100
     # n_range = range(n_start, n_stop+1, n_step)
-    n_range = [400]
+    n_range = [800]
 
-    e_start = 400
-    e_stop = 400
-    e_step = 1
+    e_start = 10
+    e_stop = 200
+    e_step = 10
     e_range = range(e_start, e_stop+1, e_step)
-    e_range = [50, 100, 150, 200, 250, 270, 300, 350, 400, 450, 500]
+    # e_range = [50, 100, 150, 200, 250, 270, 300, 350, 400, 450, 500]
 
     float_digits = 10
     p_start = 0.0001
@@ -128,6 +128,7 @@ def main(
         plot_data.append(data)
         plot_labels.append(plot_xlabels_dict[p_range[i]])
 
+
     import matplotlib.pyplot as plt
     marker_styles=['o','^','s','D','p','+','*']
 
@@ -136,7 +137,13 @@ def main(
     for i in range(len(plot_data)):
         ax.scatter(plot_range, plot_data[i], marker=marker_styles[i])
 
+    # dot_prod[0].plot(kind='bar')
+    # ax.axis('equal')
+
+    # plt.yticks(range(0, max(all_percentiles_set)+1))
+    # plt.xticks(plot_range, plot_xlabels, rotation=45)
     plt.legend(plot_labels, loc="upper left")
+    # plt.title(f'Maximum PRL sizes for n={n_start} and varying probabilities of revocation')
 
     import tikzplotlib
     filename = f"e-plot_n{n_range[0]}"

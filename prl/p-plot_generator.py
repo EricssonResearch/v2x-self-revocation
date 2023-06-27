@@ -12,7 +12,6 @@ import pickle
 import os
 app = typer.Typer(add_completion=False)
 
-
 def get_percentiles(percentiles_list, distribution):
     cumulatives = [distribution[0]]
     for i in range(1,len(distribution)):
@@ -41,23 +40,23 @@ def main(
 
     # pick a series
     # here let's do n=100 to 1000 and e = 5 and p = 0.0001
-    n_start = 400
-    n_stop = 400
-    n_step = 100
-    n_range = range(n_start, n_stop+1, n_step)
-    n_range = [400]
+    # n_start = 400
+    # n_stop = 400
+    # n_step = 100
+    # n_range = range(n_start, n_stop+1, n_step)
+    n_range = [800]
 
-    e_start = 400
-    e_stop = 400
-    e_step = 1
-    e_range = range(e_start, e_stop+1, e_step)
-    e_range = [300]
+    # e_start = 400
+    # e_stop = 400
+    # e_step = 1
+    # e_range = range(e_start, e_stop+1, e_step)
+    e_range = [30]
 
     float_digits = 10
-    p_start = 0.0001
-    p_stop = 0.001
-    p_step = 0.0001
-    p_range = [round(f, float_digits) for f in np.arange(p_start, p_stop+p_step, p_step)]
+    # p_start = 0.0001
+    # p_stop = 0.001
+    # p_step = 0.0001
+    # p_range = [round(f, float_digits) for f in np.arange(p_start, p_stop+p_step, p_step)]
     #
     # p range for manual attackers
     honest1 = 0.000000116323325
@@ -68,7 +67,10 @@ def main(
     p_range = [honest1]
     p_range.extend(honest1_attacker1)
     p_range.append(honest2)
+    # p_range.extend(honest1_attacker2)
     p_range.extend(honest2_attacker1)
+    # p_range.extend(honest2_attacker2)
+    # p_range = sorted(p_range)
     print(p_range)
 
     attacker_occurrences = ['1%', '2%', '5%', '10%', '20%']
@@ -101,6 +103,11 @@ def main(
 
     print(f'Parsing all stationary distribution files in {cache_dir}')
     all_dicts = []
+    # for f in os.listdir(cache_dir):
+    #     if str(f).endswith('stat_dist') and fits_criteria(str(f)):
+    #         print(f'Including {f}')
+    #         with (cache_dir / f).open('rb') as f:
+    #             all_dicts.append(pickle.load(f))
     for expected_p in p_range:
         for expected_n in n_range:
             for expected_e in e_range:
@@ -157,15 +164,23 @@ def main(
     for i in range(len(plot_data)):
         ax.scatter(plot_range, plot_data[i], marker=marker_styles[i])
 
+    # dot_prod[0].plot(kind='bar')
+    # ax.axis('equal')
+
+    # plt.yticks(range(0, max(all_percentiles_set)+1))
     plt.xticks(plot_range, plot_xlabels, rotation=45)
     plt.legend(plot_labels, loc="upper left")
+    # plt.title(f'Maximum PRL sizes for n={n_start} and varying probabilities of revocation')
 
-    import tikzplotlib
     filename = f"n{n_range[0]}_e{e_range[0]}"
-    tikzplotlib.save(filename + '.tex')
+
     plt.title(filename)
     plt.savefig(filename + '.png')
+    print(f'Saved to {filename}[.tex, .png]')
     # plt.show()
+
+    import tikzplotlib
+    tikzplotlib.save(filename + '.tex')
 
 if __name__ == "__main__":
     app()
