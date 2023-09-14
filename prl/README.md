@@ -9,7 +9,57 @@ In the paper, multiple of these stationary distributions were then aggregated in
 Since runs can take a few minutes, the script allows to set up a cache directory where the markov matrix is stored as a Python pickle file. 
 This allows the other scripts to quickly parse and plot multiple runs without needing to recompute the whole matrices.
 
-## Setup
+## Docker setup
+
+The Makefile provides multiple targets to evaluate and reuse the artifact and can also be used as a point of reference for the individual elements in the paper.
+
+** We strongly suggest to not immediately run `make all` as that will take a long time to complete **.
+
+### Setup
+
+The PRL scripts use a Docker container with Python 3.8 and all requirements pre-installed. To test it out, run:
+
+```bash
+make test
+```
+
+Once this very small example executes correctly, attempt to generate a single distribution (i.e. reproduce a single data point of one of the Markov Chain graphs in the paper):
+```bash
+make single
+```
+
+On our local laptop, this single distribution requires ~3 minutes to generate. The following targets thus parallelize the generation of markov matrices and will use all threads on a system.
+
+### Reproduce graphs
+
+To reproduce all graphs in the paper, we provide individual targets for each plot:
+
+
+```bash
+# Plot series over the number of pseudonyms
+make n-plot
+# Plot series over the time each pseudonym stays in the list
+make t-plot
+# Plot series over the different probabilities
+make p-plot
+# Generate distribution for Tv
+make tv-distribution
+
+# Or, run all at once (will take some time).
+# Once all data has been generated, the make all command will also run quick as it can use the cached versions:
+make all
+```
+
+### Simple tikz plot
+
+The appendix lists a simple transition graph (Fig. 15). The LaTeX Tikz code for this can be generated with:
+
+```bash
+make tikz
+```
+
+
+## Local setup
 The scripts all utilize Python. Our system runs Python 3.8.10 and newer Python versions may not work properly due to changes to the asyncio library used by the `generate_plots.py` script. 
 This should only affect convenient generation of multiple settings at the same time and should not impact the core `main.py` script.
 
@@ -48,10 +98,11 @@ Scenario 2: vehicles get revoked at least once a day with 99% probability
 0.000196612735153
 ```
 
-Then multiple plots can be generated at the same time with the `generate_plots.py` script (careful, potentially only with python versions before 3.9 or 3.10).
+Then multiple plots can be generated at the same time with the `generate_plots.py` script (careful, only with python up to 3.8).
 ```bash
 python3 generate_plots.py -e 30 -n 800 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489
 python3 generate_plots.py -e 30 -n 800 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
+python3 p-plot_generator.py
 ```
 
 ## Reproducing the data used in the Tv plot
@@ -72,8 +123,8 @@ python3 tv-distribution.py
 ```
 
 ## Generating the appendix plots of the paper
-Besides varying the probability, the paper also contains plots that vary `n` and `e` (T_prl).
-This is done by the scripts `python3 e-plot_generator.py` and `python3 n-plot_generator.py` that work in a similar fashion as the previous plot script.
+Besides varying the probability, the paper also contains plots that vary `n` and `t` (T_prl).
+This is done by the scripts `python3 t-plot_generator.py` and `python3 n-plot_generator.py` that work in a similar fashion as the previous plot script.
 
 ### Reproducing the data used in the appendix plots
 For the appendix plots we used the following parameters:

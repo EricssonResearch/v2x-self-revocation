@@ -21,50 +21,44 @@ import asyncio
 
 app = typer.Typer(add_completion=False)
 
-
-"""
-Careful, this is a wonky script :)
-"""
-
-
 # Using typer here: https://typer.tiangolo.com/tutorial/arguments/optional/
 @app.command()
 def main(
         n: int = typer.Option(
             2, "-n",
-            help="Size of PRL.",
+            help="Size of the PRL.",
         ),
         n_max: int = typer.Option(
             1, "--n-max",
-            help="Max PRL size. Relative to n.",
+            help="Max PRL size. Relative to n (used in `range(n, n + n_max, n_step)`).",
         ),
         n_step: int = typer.Option(
             1, "--n-step",
-            help="Increment for n.",
+            help="Increment for n (used in `range(n, n + n_max, n_step)`).",
         ),
         e: int = typer.Option(
             2, "-e",
-            help="Epochs that a certificate stays in the PRL.",
+            help="Number of epochs that a certificate stays in the PRL.",
         ),
         e_max: int = typer.Option(
             1, "--e-max",
-            help="Max epochs. Relative to e",
+            help="Max epochs. behaves the same as n-max",
         ),
         e_step: int = typer.Option(
             1, "--e-step",
-            help="Increment for e.",
+            help="Increment for e, behaves the same as n-step",
         ),
         p: List[float] = typer.Option(
             [0.1], "-p",
-            help="Probability of a certificate being revoked.",
+            help="Probability of a certificate being revoked. Argument can be given multiple times to create a list of probabilities to generate.",
         ),
         p_max: float = typer.Option(
             0.1, "--p-max",
-            help="Max probability. Relative to p",
+            help="Max probability if p is not given multiple times. Then, behaves the same as n-max.",
         ),
         p_step: float = typer.Option(
             0.1, "--p-step",
-            help="Increment for p.",
+            help="Increment for p if p is not given multiple times. Then, behaves the same as n-step.",
         ),
         path: Path = typer.Option(
             'plots', "--path", help="Path to folder to write plots",
@@ -72,16 +66,13 @@ def main(
         )
 ):
     '''
-    Calculate stuff for the PRL probabilities. Assume a markov chain
+    Calculate a series of markov matrices for a range of pseudonym revocation lists. In the paper graphs, this equates to one series, e.g. the series of n=100 to n=1000 for otherwise fixed parameters.
     '''
 
     print(f'Running main script for n=[{n},{n+n_max}], e=[{e},{e+e_max}], and p={p}')
     num_threads = (n_max) * (e_max)
     print(f'Creating dir {str(path)}')
     path.mkdir(parents=True, exist_ok=True)
-
-    async def create_plot(plot_n, plot_p, plot_e):
-        print(f'n {plot_n}, p {plot_p}, e {plot_e}')
 
     def shutdown():
         for task in asyncio.all_tasks():

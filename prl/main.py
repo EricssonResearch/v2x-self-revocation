@@ -53,41 +53,41 @@ app = typer.Typer(add_completion=False)
 def main(
         n: int = typer.Option(
             2, "-n",
-            help="Size of PRL.",
+            help="Size of the PRL.",
         ),
         e: int = typer.Option(
             2, "-e",
-            help="Epochs that a certificate stays in the PRL.",
+            help="Number of epochs that a certificate stays in the PRL.",
         ),
         p: float = typer.Option(
             0.1, "-p",
             help="Probability of a certificate being revoked.",
         ),
-        plot: bool = typer.Option(
-            False, "-g",
-            help="Plot state probabilities into a graph.",
-        ),
         tikz_file: Path = typer.Option(
-            None, "-f", help="Path to tikz file to write to",
+            None, "-f", help="Give a path to write the transition graph to a tikz file (Fig. 15 in paper).",
                 exists=False, dir_okay=False, readable=True,
         ),
+        plot: bool = typer.Option(
+            False, "-g",
+            help="Set to true to plot the state probabilities into a bar graph.",
+        ),
         plot_file: Path = typer.Option(
-            None, "--plot-path", help="Path to plot file to write to",
+            None, "--plot-path", help="Path to plot file to write bar graph to",
                 exists=False, dir_okay=False, readable=True,
         ),
         cache_dir: Path = typer.Option(
-            None, "--cache-dir", help="Path to cache result dict to",
+            None, "--cache-dir", help="Path to cache directory",
             exists=False, dir_okay=True, readable=True, file_okay=False
         ),
         allow_cached: bool = typer.Option(
-            False, '--allow-cached', help='Skip calculations if cached folder contains data.'
+            False, '--allow-cached', help='Skip calculations if cached folder already contains data of this run.'
         ),
         force_cached: bool = typer.Option(
             False, '--force-cached', help='Enforce to skip calculations and use cached data. Abort otherwise.'
         )
 ):
     '''
-    Calculate stuff for the PRL probabilities. Assume a markov chain
+    Calculate a single markov matrix for a pseudonym revocation list of specific given parameters. In the paper graphs, this equates to one of the dots, i.e., to one data point.
     '''
 
     actual_n = n+1
