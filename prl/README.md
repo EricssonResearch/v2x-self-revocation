@@ -1,19 +1,39 @@
 # Modeling the PRL size as a markov chain
+
 This directory contains the scripts that were used to calculate, aggregate, and plot the figures regarding the markov model.
 
 At the core of this directory stands the `main.py` script that takes different parameters for `n`, `p`, and `e` (in the paper called T_prl).
 Based on these parameters, the script calculates the G and L probabilities, and combines them into the markov matrix.
-Finally, it solves the linear equation to gain the stationary distribution and plots the individual probabilities per state.
+Finally, it solves the linear equation to gain the stationary distribution and can also plot the individual probabilities per state.
 In the paper, multiple of these stationary distributions were then aggregated into a single plot and the plots of individual state probabilities were not used.
 
 Since runs can take a few minutes, the script allows to set up a cache directory where the markov matrix is stored as a Python pickle file. 
 This allows the other scripts to quickly parse and plot multiple runs without needing to recompute the whole matrices.
 
+## Runtime
+
+Generating the individual markov matrices takes some but not an excessive amount of time. To speed it up a little bit, we parallelized the below scripts and made sure to cache generated results so that they can be reused by the next scripts (since the results are deterministic). Thus, usually only the first run of a script takes a long time and all successive runs are immediate since they can simply reload the cached data from disk.
+
+Here is a short overview as a reference how long each Makefile target took on our development machine:
+
+| Target           | Time |
+| :--------------- | :--  |
+| test             | 1 second    |
+| tikz             | 1 second    |
+| single           | 3 minutes   |
+| tv-distribution  | 18 minutes  |
+| p-plot           |    minutes  |
+| n-plot           |    minutes  |
+| t-plot           |    minutes  |
+| all (first run)  | |
+| all (second run) | |
+
 ## Docker setup
 
 The Makefile provides multiple targets to evaluate and reuse the artifact and can also be used as a point of reference for the individual elements in the paper.
 
-** We strongly suggest to not immediately run `make all` as that will take a long time to complete **.
+** We strongly suggest to not immediately run `make all` as that will take a long time to complete **. 
+Since we did not optimize these scripts, they may hog resources. If you prefer to just let this run and com back later, of course feel free to run `make all` and check back after a few hours.
 
 ### Setup
 
@@ -24,6 +44,7 @@ make test
 ```
 
 Once this very small example executes correctly, attempt to generate a single distribution (i.e. reproduce a single data point of one of the Markov Chain graphs in the paper):
+
 ```bash
 make single
 ```
@@ -33,7 +54,6 @@ On our local laptop, this single distribution requires ~3 minutes to generate. T
 ### Reproduce graphs
 
 To reproduce all graphs in the paper, we provide individual targets for each plot:
-
 
 ```bash
 # Plot series over the number of pseudonyms
@@ -60,21 +80,29 @@ make tikz
 
 
 ## Local setup
+
 The scripts all utilize Python. Our system runs Python 3.8.10 and newer Python versions may not work properly due to changes to the asyncio library used by the `generate_plots.py` script. 
 This should only affect convenient generation of multiple settings at the same time and should not impact the core `main.py` script.
 
 To get started, simply install the dependencies in the `requirements.txt` file `pip3 install -r requirements.txt`.
 
 ## Generating a single stationary distribution
+
 Run one iteration of the main script like this:
+
 ```bash
 python3 main.py -n 800 -p 0.0001 -e 30 --cache-dir=cached/ --force-cached -g
 ```
+
 `--help` gives more information but `n`, `p`, and `e` (T_prl) are defined as in the paper while `--cache-dir` defines the caching directory, `--force-cached` prevents recomputation and only relies on the data already in the `cached` folder, and `-g` instructs to plot the stationary distribution of these parameters.
 
 ## Generating the first plot of the paper
+
 The first plot of the paper depicts multiple scenarios that vary in their probability and visualizes different percentiles.
-The script `p-plot_generator.py` performs this operation, generates a plot and also creates a tikz export. Simply run it with `python3 p-plot_generator.py` (assuming the cached markov matrices are in `cached`).
+The script `p-plot_generator.py` performs this operation, generates a plot and also creates a tikz export. Simply run it with `python3 p-plot_generator.py` (assuming the cached markov matrices are in `cached`). The `p-plot_generator.py` script will abort if it can not load all the required data points from the `cached` directory. Thus, to run it, you must first generate this data.
+
+The `make p-plot` target does this by generating the individual data first, see below for how to do this manually.
+
 
 ### Reproducing the data used in the first plot
 
@@ -99,21 +127,21 @@ Scenario 2: vehicles get revoked at least once a day with 99% probability
 ```
 
 Then multiple plots can be generated at the same time with the `generate_plots.py` script (careful, only with python up to 3.8).
+
 ```bash
 python3 generate_plots.py -e 30 -n 800 -p 0.000000116323325 -p 0.000007813830433 -p 0.000015511337541 -p 0.000038603858866 -p 0.000077091394407 -p 0.000154066465489
 python3 generate_plots.py -e 30 -n 800 -p 0.000053299160406 -p 0.000060464839143 -p 0.000067630517880 -p 0.000089127554093 -p 0.000124955947779 -p 0.000196612735153
 python3 p-plot_generator.py
 ```
 
+If you happen to not want to use the `generate_plots.py` script (i.e. due to Python > 3.8), you can also call `main.py` multiple times with `-e 30 -n 800` and `-p` set to each option included in the `generate_plots.py` calls.
+
 ## Reproducing the data used in the Tv plot
 
-For the plot that shows the size of the HB in relation to the value of Tv (cf.
-Section VII-C), we used the data for the PRL size from the worst possible
-scenario, i.e., Scenario 2 with 20% attackers, with probability
-`0.000196612735153`. For this data, we used a fixed value `n` of 800 and the
-following values for `e` (T_prl): `[30, 150, 300, 900]`.
+For the plot that shows the size of the HB in relation to the value of Tv (cf. Section VII-C), we used the data for the PRL size from the worst possible scenario, i.e., Scenario 2 with 20% attackers, with probability `0.000196612735153`. For this data, we used a fixed value `n` of 800 and the following values for `e` (T_prl): `[30, 150, 300, 900]`.
 
 The data can be obtained by running the following commands:
+
 ```bash
 python3 generate_plots.py -e 30 -n 800 -p 0.000196612735153
 python3 generate_plots.py -e 150 -n 800 -p 0.000196612735153
@@ -123,13 +151,15 @@ python3 tv-distribution.py
 ```
 
 ## Generating the appendix plots of the paper
-Besides varying the probability, the paper also contains plots that vary `n` and `t` (T_prl).
+
+Besides varying the probability, the paper also contains plots that vary `n` and `e` (T_prl).
 This is done by the scripts `python3 t-plot_generator.py` and `python3 n-plot_generator.py` that work in a similar fashion as the previous plot script.
 
 ### Reproducing the data used in the appendix plots
+
 For the appendix plots we used the following parameters:
+
 ```bash
-#! bin/bash
 python3 generate_plots.py -e 30 -n 400 -p 0.000000116323325 -p 0.000053299160406 -p 0.000154066465489 -p 0.000196612735153
 python3 generate_plots.py -e 30 -n 500 -p 0.000000116323325 -p 0.000053299160406 -p 0.000154066465489 -p 0.000196612735153
 python3 generate_plots.py -e 30 -n 600 -p 0.000000116323325 -p 0.000053299160406 -p 0.000154066465489 -p 0.000196612735153
@@ -160,9 +190,11 @@ python3 generate_plots.py -e 200 -n 800 -p 0.000000116323325 -p 0.00005329916040
 ```
 
 ## Generating the visualization of a markov matrix
+
 The `main.py` script can also generate the tikz graph that is used in the appendix to visualize our markov chain.
 Simply call it with the `-f tikz_file_name.tex` option. Beware that large graphs may crash PDFtex or are not visualized correctly.
 But since large graphs are not very readable anyway, we opted for small parameters yielding to the command:
+
 ```bash
 python3 main.py -n 3 -p 0.01 -e 2 -f tikz-graph.tex
 ```

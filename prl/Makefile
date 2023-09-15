@@ -1,9 +1,11 @@
 # https://stackoverflow.com/a/23324703
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-
 DOCKER_NAME ?= selfrevocation/prl_size
-DOCKER_BINDING = -v $(ROOT_DIR):/usr/src/app --user "$(shell id -u):$(shell id -g)"
+DOCKER_BINDING = -v $(ROOT_DIR):/usr/src/app -t
+# It would be nice to use the local user for permissions but that breaks matplotlib
+#--user "$(shell id -u):$(shell id -g)"
+# To mitigate this, we now just run the make clean inside docker to have the right permissions to remove the files we created.
 
 build-docker:
 	docker build . -t $(DOCKER_NAME)
@@ -12,7 +14,7 @@ test:
 	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 3 -p 0.01 -e 2 --cache-dir=cached/ --allow-cached
 
 single:
-	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 800 -p 0.0001 -e 30 --cache-dir=cached/ --allow-cached -g
+	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 800 -p 0.0001 -e 30 --cache-dir=cached/ --allow-cached
 
 tikz:
 	@echo "Generating transition graph (Fig. 15)."
@@ -95,5 +97,6 @@ check:
 all: check p-plot t-plot n-plot tv-distribution tikz
 	@echo Successfully created all graphs!
 
+# Run clean inside docker so that we can clear the cached Directory and files created by the root user in docker.
 clean:
-	rm -rf cached *.tex *.png
+	docker run $(DOCKER_BINDING) $(DOCKER_NAME) rm -rf cached plots *.tex *.png

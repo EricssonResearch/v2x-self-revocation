@@ -11,6 +11,9 @@ from pathlib import Path
 from rich.pretty import pprint
 
 def draw_as_tikz(matrix, file):
+    """
+    Draw the specified markov chain as a transition graph and output it as LaTeX code with tikz.
+    """
     tex = '''
 \\documentclass[]{article}
 \\usepackage[a0paper]{geometry}
@@ -110,7 +113,6 @@ def main(
 
     def get_loss(i, k):
         if (i,k) not in loss_cache:
-            # loss_cache[(i,k)] = math.comb(i, k) * math.pow(1 / e, i - k) * math.pow(1 - (1 / e), k)
             val = math.comb(i, k)
             if val > 0:
                 val = val * math.pow(1 / e, k) * math.pow(1 - (1 / e), i - k)
@@ -120,11 +122,8 @@ def main(
     def get_markov(i, j):
         prob = 0.0
         for l in range(max(i-j, 0), i+1):
-            # print(f'Attempting i {i}, j {j} and l {l} with abs(j-i+l) {abs(j-i+l)}')
             try:
-                # this_prob = loss_probabilities[i][l] * gain_probabilities[i][abs(j-i+l)]
                 this_prob = get_loss(i,l) * get_gain(i, abs(j-i+l))
-                # print(f'\tResult is {this_prob}')
                 prob += this_prob
             except KeyError:
                 pass
@@ -139,26 +138,9 @@ def main(
         matrix = [[func(i, j) for j in range(actual_n)] for i in range(actual_n)]
         # For pretty printing, use pandas and add a sum column
         original_df = DataFrame(matrix)
-        #
-        # col_sums = []
-        # for i in range(actual_n):
-        #     val = 0
-        #     for j in range(actual_n):
-        #         val += matrix[j][i]
-        #     col_sums.append(val)
 
-        # df_cols = DataFrame({'Sum': col_sums})
-        # df_cols = df_cols.join(DataFrame({'Sum_probs': [i/actual_n for i in col_sums]}))
-
-        # df = pandas.concat([df,df_cols.transpose()])
         df = original_df.copy()
         df.loc[:,'Sum'] = df.sum(axis=1)
-        # col_sum = df.sum(axis=0)
-        # col_sum_n = col_sum.divide(actual_n)
-        # df.loc['Sum', :] = col_sum
-        # df.loc['Sum/n', :] = col_sum_n
-
-        # df = df.join(DataFrame({'Sum': [df[i].sum() for i in iter(df)]}))
 
         print(df)
         print('')
@@ -208,17 +190,19 @@ def main(
     add a 1 to the last element of the zero vector b
     solve A x = b 
     """
-    # Get identity matrix of actual_x squared
-    I = np.eye(actual_n)
-    # Get A as P.T -I
-    A = markov_process.T - I
-    A = np.vstack([A, np.ones((1, len(A)))])  # add row of ones
-    b = np.zeros(len(A))  # prepare solution vector
-    b[-1] = 1.0  # add a one to the last entry
-    sol = np.linalg.solve(A.T @ A, A.T @ b)  # solve the normal equation
-    print(sol)
-    print(np.sum(sol))
+    # The intuitive formula is this:
+    # # Get identity matrix of actual_x squared
+    # I = np.eye(actual_n)
+    # # Get A as P.T -I
+    # A = markov_process.T - I
+    # A = np.vstack([A, np.ones((1, len(A)))])  # add row of ones
+    # b = np.zeros(len(A))  # prepare solution vector
+    # b[-1] = 1.0  # add a one to the last entry
+    # sol = np.linalg.solve(A.T @ A, A.T @ b)  # solve the normal equation
+    # print(sol)
+    # print(np.sum(sol))
 
+    # However, we can also solve this equation:
     # Get identity matrix of actual_x squared
     I = np.eye(actual_n)
     # Get A as I.T - P.T
@@ -230,25 +214,28 @@ def main(
     b[-1] = 1.0  # add a one to the last entry
     # Solve A x = b
     sol2 = np.linalg.lstsq(A, b, rcond=None)  # solve the normal equation
-    print(sol2)
+    print("Markov matrix:")
+    print(sol2[0])
+    print("Sum (should sum to 1 but there is always an approxmiation error):")
     print(np.sum(sol2[0]))
 
-    print('diff')
-    print(sol2[0] - sol)
-    print(np.sum(sol2[0] - sol))
+    # print('diff')
+    # print(sol2[0] - sol)
+    # print(np.sum(sol2[0] - sol))
 
+    # For development purposes, we can also sanity check our solution like this:
     # do a double check how sane the solution is by stepping it and taking diff
-    check = sol2[0]
-    for i in range(100):
-        check = np.dot(check, markov_process)
-    print('Diff between solution and solution after some step with the markov matrix:')
-    check_diff = sol2[0] - check
-    print(check_diff)
-    check_error = 0
-    for i in check_diff:
-        check_error += abs(i)
-    print(f'Summed diff: {check_error}')
-    print(f'sum of check vector: {sum(check)}')
+    # check = sol2[0]
+    # for i in range(100):
+    #     check = np.dot(check, markov_process)
+    # print('Diff between solution and solution after some step with the markov matrix:')
+    # check_diff = sol2[0] - check
+    # print(check_diff)
+    # check_error = 0
+    # for i in check_diff:
+    #     check_error += abs(i)
+    # print(f'Summed diff: {check_error}')
+    # print(f'sum of check vector: {sum(check)}')
 
     if cache_dir:
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -268,7 +255,6 @@ def main(
     if plot:
         import matplotlib.pyplot as plt
         plt.bar(range(actual_n), sol2[0])
-        # dot_prod[0].plot(kind='bar')
         plt.title(f'Probability for each PRL size for n={n}, p={p}, e={e}')
 
         if plot_file:
