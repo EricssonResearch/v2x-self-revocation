@@ -121,7 +121,7 @@ def main(
     plt.legend(plot_labels, loc="upper left")
 
     import tikzplotlib
-    filename = f"e-plot_n{n_range[0]}"
+    filename = f"t-plot_n{n_range[0]}"
     tikzplotlib.save(filename + '.tex')
     plt.title(filename)
     plt.savefig(filename + '.png')

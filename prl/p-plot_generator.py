@@ -119,7 +119,7 @@ def main(
     plt.xticks(plot_range, plot_xlabels, rotation=45)
     plt.legend(plot_labels, loc="upper left")
 
-    filename = f"n{n_range[0]}_e{e_range[0]}"
+    filename = f"p-plot_n{n_range[0]}_e{e_range[0]}"
 
     plt.title(filename)
     plt.savefig(filename + '.png')

@@ -18,7 +18,7 @@ single:
 
 tikz:
 	@echo "Generating transition graph (Fig. 15)."
-	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 3 -p 0.01 -e 2 -f tikz-graph.tex
+	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 3 -p 0.1 -e 2 -f tikz-graph.tex
 	cat tikz-graph.tex
 
 p-plot:
