@@ -14,7 +14,7 @@ test:
 	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 3 -p 0.01 -e 2 --cache-dir=cached/ --allow-cached
 
 single:
-	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 800 -p 0.0001 -e 30 --cache-dir=cached/ --allow-cached
+	docker run $(DOCKER_BINDING) $(DOCKER_NAME) python3 main.py -n 800 -p 0.000000116323325 -e 30 --cache-dir=cached/ --allow-cached
 
 tikz:
 	@echo "Generating transition graph (Fig. 15)."

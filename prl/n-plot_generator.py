@@ -17,7 +17,6 @@ def get_percentiles(percentiles_list, distribution):
     cumulatives = [distribution[0]]
     for i in range(1,len(distribution)):
         cumulatives.append(distribution[i] + cumulatives[i-1])
-    # print(f'Cumulatives are {cumulatives[0:6]}')
 
     def find_cumulative(val):
         for j in range(len(cumulatives)):
@@ -48,6 +47,8 @@ def main(
 
     e_range = [30]
 
+    print(f'I will plot for a range of number of vehicles in: {str(n_range)} and a range of possible time epochs (T_PRL) in: {str(e_range)}')
+
     # p range for manual attackers
     honest1 = 0.000000116323325
     honest2 = 0.000053299160406
@@ -59,7 +60,6 @@ def main(
     p_range.append(honest1_attacker1[4])
     p_range.append(honest2)
     p_range.append(honest2_attacker1[4])
-    print(p_range)
 
     attacker_occurrences = ['1%', '2%', '5%', '10%', '20%']
     plot_xlabels_dict = { honest1: 'Scenario 1 - 0%', honest2: 'Scenario 2 - 0%' }
@@ -68,11 +68,12 @@ def main(
     for i in range(len(honest2_attacker1)):
         plot_xlabels_dict[honest2_attacker1[i]] = f'Scenario 2 - {attacker_occurrences[i]}'
     plot_xlabels = []
+    print("I will use the following probabilities:")
     print(plot_xlabels_dict)
     for prob in p_range:
         plot_xlabels.append(plot_xlabels_dict[prob])
 
-    print(f'Parsing all stationary distribution files in {cache_dir}')
+    print(f'Parsing all stationary distribution files in directory "{cache_dir}"...')
     all_dicts = []
     for expected_e in e_range:
         for expected_p in p_range:
@@ -86,13 +87,13 @@ def main(
                     print(f'Could not find file {expected_filename}! Aborting.')
                     sys.exit(-1)
 
-
-    print('List is:')
+    print('The list of markov matrices I loaded is (tuples of (n,T_PRL,p)):')
     print(str([(dd['n'], dd['e'], dd['p']) for dd in all_dicts]))
 
     percentiles = [0.99]
     print(f'Percentiles for lower/middle/upper are {str(percentiles)}')
     all_percentiles = [get_percentiles(percentiles, d['dist']) for d in all_dicts]
+    print("Above percentiles for each markov matrix:")
     print(all_percentiles)
 
     plot_data = []
@@ -124,6 +125,7 @@ def main(
     tikzplotlib.save(filename + '.tex')
     plt.title(filename)
     plt.savefig(filename + '.png')
+    print(f'Saved plot to {filename}[.tex, .png]')
 
 if __name__ == "__main__":
     app()
