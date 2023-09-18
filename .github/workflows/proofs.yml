@@ -1,4 +1,4 @@
-name: run-proofs
+name: run-tamarin
 on:
   workflow_dispatch:
 
@@ -13,12 +13,14 @@ jobs:
       run: |
         cd proofs
         make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4
-        until docker ps -a --filter name=tamarin | grep tamarin ; do sleep 1; done
+        while docker ps --filter name=tamarin | grep tamarin ; do sleep 1; done
+        docker logs -n 100 tamarin
       timeout-minutes: 10
     -
       name: Run alternative design (distributed-time)
       run: |
         cd proofs
         make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4
-        until docker ps -a --filter name=tamarin | grep tamarin ; do sleep 1; done
+        while docker ps --filter name=tamarin | grep tamarin ; do sleep 1; done
+        docker logs -n 100 tamarin
       timeout-minutes: 10
