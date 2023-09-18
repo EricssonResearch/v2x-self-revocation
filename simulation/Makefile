@@ -9,6 +9,9 @@ NUM_ATTACKERS   ?= $(shell cat $(ENV_FILE) | grep NUM_ATTACKERS | cut -d "=" -f2
 NUM_GROUPS      ?= $(shell cat $(ENV_FILE) | grep NUM_GROUPS | cut -d "=" -f2)
 ATTACKER_LEVEL  ?= $(shell cat $(ENV_FILE) | grep ATTACKER_LEVEL | cut -d "=" -f2)
 
+SIM_TIME        ?= $(shell cat $(ENV_FILE) | grep SIM_TIME | cut -d "=" -f2)
+DOWN_TIME       ?= $(shell cat $(ENV_FILE) | grep DOWN_TIME | cut -d "=" -f2)
+
 REPLICASET_VEHICLES = $(shell kubectl describe deployment -n v2x vehicle | grep "replica set" | sed -r "s/ /\n/g" | grep "vehicle")
 REPLICASET_ATTACKERS = $(shell kubectl describe deployment -n v2x attacker | grep "replica set" | sed -r "s/ /\n/g" | grep "attacker")
 
@@ -23,6 +26,11 @@ build:
 
 run_docker: gen_ra_key
 	docker compose up --build --remove-orphans --force-recreate
+
+test: gen_ra_key
+	docker compose up --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from admin
+
+test:
 
 run_kubernetes: gen_ra_key
 	kubectl create namespace v2x

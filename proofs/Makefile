@@ -9,10 +9,13 @@ VOLUME           = $(shell cd $(MODEL); pwd)
 OUT_FOLDER       = $(shell pwd)/out
 
 prove: clean __create_out
-	docker run --name $(NAME) -it $(ENV) -d -v $(OUT_FOLDER):/home/tamarin $(IMAGE):$(VERSION) tamarin-prover --prove --output=output.spthy theory.spthy +RTS -N$(THREADS) -RTS
+	docker run --name $(NAME) --entrypoint tamarin-prover $(ENV) -d -v $(OUT_FOLDER):/home/tamarin $(IMAGE):$(VERSION) --prove --output=output.spthy theory.spthy +RTS -N$(THREADS) -RTS
 
 interactive: clean __create_out
-	docker run --name $(NAME) -it $(ENV) --network host -d -v $(OUT_FOLDER):/home/tamarin $(IMAGE):$(VERSION) tamarin-prover interactive theory.spthy +RTS -N$(THREADS) -RTS
+	docker run --name $(NAME) --entrypoint tamarin-prover $(ENV) --network host -d -v $(OUT_FOLDER):/home/tamarin $(IMAGE):$(VERSION) interactive theory.spthy +RTS -N$(THREADS) -RTS
+
+test: clean __create_out
+	docker run --name $(NAME) --entrypoint tamarin-prover $(ENV) -v $(OUT_FOLDER):/home/tamarin $(IMAGE):$(VERSION) --prove=sign_possible theory.spthy
 
 clean:
 	@docker stop $(NAME) || true

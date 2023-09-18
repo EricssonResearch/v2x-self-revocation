@@ -112,4 +112,6 @@ services:
       - "8080:80"
   admin:
     image: yauritux/busybox-curl
-    command: sleep 360000
+    command: sleep $SIM_TIME
+    env_file:
+      - .env

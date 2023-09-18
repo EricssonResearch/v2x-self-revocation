@@ -1,0 +1,34 @@
+name: test-running
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: Tamarin
+      run: |
+        cd proofs
+        make test
+      timeout-minutes: 5
+    -
+      name: PRL
+      run: |
+        cd prl
+        pip install -r requirements.txt
+        make test
+      timeout-minutes: 5
+    -
+      name: Simulation
+      run: |
+        cd simulation
+        pip install -r scripts/requirements.txt
+        make test SIM_TIME=120
+      timeout-minutes: 5

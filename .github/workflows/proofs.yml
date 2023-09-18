@@ -1,0 +1,24 @@
+name: run-proofs
+on:
+  workflow_dispatch:
+
+jobs:
+  Tamarin:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: Run main design (centralized-time)
+      run: |
+        cd proofs
+        make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4
+        until docker ps -a --filter name=tamarin | grep tamarin ; do sleep 1; done
+      timeout-minutes: 10
+    -
+      name: Run alternative design (distributed-time)
+      run: |
+        cd proofs
+        make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4
+        until docker ps -a --filter name=tamarin | grep tamarin ; do sleep 1; done
+      timeout-minutes: 10
