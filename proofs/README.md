@@ -37,20 +37,12 @@ both cases, the artifact requires a Linux-based operating system to run. We
 tested our artifacts on Ubuntu 22.04 and Debian 12, but other (recent)
 distributions should work as well.
 
-Make sure your machine has at least **4 GB** of RAM available, otherwise Tamarin
+Make sure your machine has at least **4 GB of RAM available**, otherwise Tamarin
 might not be able to complete (i.e., it might be killed due to OOM exceptions).
 
-### Local dependencies
-
-To run locally, Tamarin needs to be installed on your machine. Please check the
-[Tamarin
-documentation](https://tamarin-prover.github.io/manual/master/book/002_installation.html)
-for instructions. Additionally, Python 3 needs to be installed in order to run
-the oracles, making sure that it can be invoked by running `python`.
-  - If not, you can create a symbolic link: `sudo ln -s /usr/bin/python3 /usr/bin/python`.
-
-
 ## Run locally
+
+Python 3 is required to run the oracles: `sudo apt install python3`
 
 **NOTE**: As mentioned above, Tamarin `1.8.0` is currently not able to verify
 our models efficiently. The instructions below will install Tamarin `1.6.1`.
@@ -134,7 +126,8 @@ found under `out/output.spthy`.
 
 To verify the alternative design discussed in Section V-B and Appendix B, simply
 replace `MODEL=centralized-time` with `MODEL=distributed-time` in the `make
-prove` above.
+prove` above. Make sure that the previous container has completed before running
+the new one.
 
 ### Interactive mode
 
