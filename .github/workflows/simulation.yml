@@ -1,0 +1,15 @@
+name: run-simulations
+on:
+  workflow_dispatch:
+
+jobs:
+  Minikube:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: Setup minikube
+      run: |
+        minikube start
+        kubectl label nodes minikube workerNode=yes
