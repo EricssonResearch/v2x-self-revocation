@@ -1,9 +1,9 @@
-name: run-simulations
+name: artifacts
 on:
   workflow_dispatch:
 
 jobs:
-  Minikube:
+  simulation:
     runs-on: ubuntu-latest
     steps:
     -
@@ -15,18 +15,50 @@ jobs:
         pip install -r scripts/requirements.txt
         make run_minikube
     -
-      name: Test run scenario a1-honest
+      name: Test run
       run: |
         cd simulation
-        make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=300 DOWN_TIME=30
+        make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
     -
-      name: Plot
+      name: Run Scenario A1
       run: |
         cd simulation
-        make plot SCENARIO=scenario-a1 PLOTS=honest
+        make run_simulations SCENARIO=scenario-a1 SIM_TIME=600 DOWN_TIME=60
+    -
+      name: Generate plots
+      run: |
+        cd simulation
+        make plot SCENARIO=scenario-a1 PLOTS=honest,smart,blind,smart-prl
     - 
       name: Upload results
       uses: actions/upload-artifact@v3
       with:
-        name: results-data
+        name: simulation
         path: simulation/simulations
+  proofs:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: Run main design (centralized-time)
+      run: |
+        cd proofs
+        make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4 OUT_FILE=res_centralized.spthy
+        while docker ps --filter name=tamarin | grep tamarin ; do sleep 1; done
+        docker logs -n 200 tamarin
+      timeout-minutes: 10
+    -
+      name: Run alternative design (distributed-time)
+      run: |
+        cd proofs
+        make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4 OUT_FILE=res_distributed.spthy
+        while docker ps --filter name=tamarin | grep tamarin ; do sleep 1; done
+        docker logs -n 200 tamarin
+      timeout-minutes: 10
+    - 
+      name: Upload results
+      uses: actions/upload-artifact@v3
+      with:
+        name: proofs
+        path: proofs/out
