@@ -148,7 +148,7 @@ missing = len(revoked) - len(revoked_filtered)
 
 if missing >= 10:
     raise Exception(f"{missing} pseudonyms missing")
-else:
+elif missing > 0:
     print(f"Warning: {missing} pseudonyms missing")
 
 print("Filtering out zero values in distributions")

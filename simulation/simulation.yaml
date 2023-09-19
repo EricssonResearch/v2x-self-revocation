@@ -3,30 +3,30 @@ scenarios:
     env:
       TRUSTED_TIME: 0
       T_V: 30
-      NUM_VEHICLES: 9
+      NUM_VEHICLES: 4
       NUM_ATTACKERS: 1
-      NUM_GROUPS: 2
+      NUM_GROUPS: 1
   - name: scenario-a2
     env:
       TRUSTED_TIME: 0
       T_V: 150
-      NUM_VEHICLES: 9
+      NUM_VEHICLES: 4
       NUM_ATTACKERS: 1
-      NUM_GROUPS: 2
+      NUM_GROUPS: 1
   - name: scenario-b1
     env:
       TRUSTED_TIME: 1
       T_V: 30
-      NUM_VEHICLES: 9
+      NUM_VEHICLES: 4
       NUM_ATTACKERS: 1
-      NUM_GROUPS: 2
+      NUM_GROUPS: 1
   - name: scenario-b2
     env:
       TRUSTED_TIME: 1
       T_V: 150
-      NUM_VEHICLES: 9
+      NUM_VEHICLES: 4
       NUM_ATTACKERS: 1
-      NUM_GROUPS: 2
+      NUM_GROUPS: 1
 runs:
   - name: 1-honest
     env:

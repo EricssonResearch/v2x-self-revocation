@@ -1,9 +1,12 @@
-LOG_DIR         ?= /logs
+LOG_DIR_MOUNT   ?= /logs
+LOG_DIR_LOCAL   ?= $(shell pwd)/logs
 SIMULATION      ?= simulation.yaml
 SIM_DIR         ?= simulations
 LOG_FILE        ?= $(SIM_DIR)/out.log
 SCENARIO        ?=
 RUN             ?=
+PLOTS			?= 
+PLOT_NAME		?= $(SCENARIO)
 
 ENV_FILE        ?= .env
 DOCKER_REGISTRY ?= docker.io
@@ -42,15 +45,15 @@ run_kubernetes: gen_ra_key
 	#kubectl --namespace v2x create secret docker-registry regcred --docker-username=$(DOCKER_USERNAME) --docker-password=$(DOCKER_TOKEN) --docker-email=$(DOCKER_EMAIL)
 	kubectl --namespace v2x create configmap system --from-env-file=$(ENV_FILE)
 	kubectl --namespace v2x create secret generic ra-keys --from-file=private=cred/ra_private.pem --from-file=public=cred/ra_public.pem
-	scripts/deploy.sh res/deployments/infra/issuer.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
-	scripts/deploy.sh res/deployments/infra/ra.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
-	scripts/deploy.sh res/deployments/infra/web.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
-	#kubectl apply -f res/deployments/infra/admin.yaml LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/infra/issuer.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR_MOUNT)
+	scripts/deploy.sh res/deployments/infra/ra.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR_MOUNT)
+	scripts/deploy.sh res/deployments/infra/web.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR_MOUNT)
+	#kubectl apply -f res/deployments/infra/admin.yaml LOG_DIR=$(LOG_DIR_MOUNT)
 	scripts/check_infra.sh
-	scripts/deploy.sh res/deployments/area/rsu.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
-	scripts/deploy.sh res/deployments/area/reporter.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
-	scripts/deploy.sh res/deployments/area/vehicle.yaml VERSION=$(VERSION) NUM_VEHICLES=$(NUM_VEHICLES) LOG_DIR=$(LOG_DIR)
-	scripts/deploy.sh res/deployments/area/attacker.yaml VERSION=$(VERSION) NUM_ATTACKERS=$(NUM_ATTACKERS) LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/area/rsu.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR_MOUNT)
+	scripts/deploy.sh res/deployments/area/reporter.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR_MOUNT)
+	scripts/deploy.sh res/deployments/area/vehicle.yaml VERSION=$(VERSION) NUM_VEHICLES=$(NUM_VEHICLES) LOG_DIR=$(LOG_DIR_MOUNT)
+	scripts/deploy.sh res/deployments/area/attacker.yaml VERSION=$(VERSION) NUM_ATTACKERS=$(NUM_ATTACKERS) LOG_DIR=$(LOG_DIR_MOUNT)
 
 scale_vehicles:
 	kubectl -n v2x scale --replicas $(NUM_VEHICLES) deployment vehicle
@@ -75,7 +78,7 @@ zip:
 
 init_simulations:
 	@echo "Initializing folders.."
-	sudo rm -rf $(LOG_DIR)/*
+	sudo rm -rf $(LOG_DIR_LOCAL)/*
 	test -f $(SIMULATION)
 	mkdir -p $(SIM_DIR)
 	cp -r $(SIMULATION) $(SIM_DIR)
@@ -89,17 +92,27 @@ init_simulations:
 	python scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
 
 run_minikube:
-	minikube start --mount --mount-string="$(pwd)/logs:/logs"
+	minikube start --mount --mount-string="$(LOG_DIR_LOCAL):$(LOG_DIR_MOUNT)"
 	kubectl label nodes minikube workerNode=yes
 
 run_simulations: init_simulations
-	./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME)
+	./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME) $(LOG_DIR_LOCAL)
 
 run_simulations_background: init_simulations
 	rm -rf $(LOG_FILE)
 	@echo "Running simulations in the background.."
 	@echo "You can check the current progress on $(LOG_FILE)"
-	screen -A -m -d -S v2x-sims ./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME) $(LOG_FILE) &
+	screen -A -m -d -S v2x-sims -L -Logfile $(LOG_FILE) ./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME) $(LOG_DIR_LOCAL) &
+	screen -r v2x-sims -X colon "logfile flush 0.001^M"
 
 aggregate_logs:
-	python scripts/log_aggregator.py $(LOG_DIR) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
+	python scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
+
+plot:
+	python scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
+
+plot_all:
+	python scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
+	python scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
+	python scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smarter,blind,smarter-prl
+	python scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smarter,blind,smarter-prl

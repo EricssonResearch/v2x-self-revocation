@@ -19,3 +19,14 @@ jobs:
       run: |
         cd simulation
         make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=300 DOWN_TIME=30
+    -
+      name: Plot
+      run: |
+        cd simulation
+        make plot SCENARIO=scenario-a1 PLOTS=honest
+    - 
+      name: Upload results
+      uses: actions/upload-artifact@v3
+      with:
+        name: results-data
+        path: simulation/simulations
