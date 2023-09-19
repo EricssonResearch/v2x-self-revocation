@@ -9,7 +9,13 @@ jobs:
     -
       uses: actions/checkout@master
     -
-      name: Setup minikube
+      name: Setup
       run: |
-        minikube start
-        kubectl label nodes minikube workerNode=yes
+        cd simulation
+        pip install -r scripts/requirements.txt
+        make run_minikube
+    -
+      name: Test run scenario a1-honest
+      run: |
+        cd simulation
+        make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=300 DOWN_TIME=30

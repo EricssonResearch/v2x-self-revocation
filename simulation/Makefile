@@ -1,3 +1,10 @@
+LOG_DIR         ?= /logs
+SIMULATION      ?= simulation.yaml
+SIM_DIR         ?= simulations
+LOG_FILE        ?= $(SIM_DIR)/out.log
+SCENARIO        ?=
+RUN             ?=
+
 ENV_FILE        ?= .env
 DOCKER_REGISTRY ?= docker.io
 DOCKER_USERNAME ?= selfrevocation
@@ -30,22 +37,20 @@ run_docker: gen_ra_key
 test: gen_ra_key
 	docker compose up --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from admin
 
-test:
-
 run_kubernetes: gen_ra_key
 	kubectl create namespace v2x
 	#kubectl --namespace v2x create secret docker-registry regcred --docker-username=$(DOCKER_USERNAME) --docker-password=$(DOCKER_TOKEN) --docker-email=$(DOCKER_EMAIL)
 	kubectl --namespace v2x create configmap system --from-env-file=$(ENV_FILE)
 	kubectl --namespace v2x create secret generic ra-keys --from-file=private=cred/ra_private.pem --from-file=public=cred/ra_public.pem
-	scripts/deploy.sh res/deployments/infra/issuer.yaml VERSION=$(VERSION)
-	scripts/deploy.sh res/deployments/infra/ra.yaml VERSION=$(VERSION)
-	scripts/deploy.sh res/deployments/infra/web.yaml VERSION=$(VERSION)
-	#kubectl apply -f res/deployments/infra/admin.yaml
+	scripts/deploy.sh res/deployments/infra/issuer.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/infra/ra.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/infra/web.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
+	#kubectl apply -f res/deployments/infra/admin.yaml LOG_DIR=$(LOG_DIR)
 	scripts/check_infra.sh
-	scripts/deploy.sh res/deployments/area/rsu.yaml VERSION=$(VERSION)
-	scripts/deploy.sh res/deployments/area/reporter.yaml VERSION=$(VERSION)
-	scripts/deploy.sh res/deployments/area/vehicle.yaml VERSION=$(VERSION) NUM_VEHICLES=$(NUM_VEHICLES)
-	scripts/deploy.sh res/deployments/area/attacker.yaml VERSION=$(VERSION) NUM_ATTACKERS=$(NUM_ATTACKERS)
+	scripts/deploy.sh res/deployments/area/rsu.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/area/reporter.yaml VERSION=$(VERSION) LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/area/vehicle.yaml VERSION=$(VERSION) NUM_VEHICLES=$(NUM_VEHICLES) LOG_DIR=$(LOG_DIR)
+	scripts/deploy.sh res/deployments/area/attacker.yaml VERSION=$(VERSION) NUM_ATTACKERS=$(NUM_ATTACKERS) LOG_DIR=$(LOG_DIR)
 
 scale_vehicles:
 	kubectl -n v2x scale --replicas $(NUM_VEHICLES) deployment vehicle
@@ -67,3 +72,34 @@ clean:
 
 zip:
 	zip -r simulation.zip res/ src/ .env docker-compose.yml Makefile README.md simulation.yaml scripts/check_infra.sh scripts/deploy.sh scripts/gen_keys.py
+
+init_simulations:
+	@echo "Initializing folders.."
+	sudo rm -rf $(LOG_DIR)/*
+	test -f $(SIMULATION)
+	mkdir -p $(SIM_DIR)
+	cp -r $(SIMULATION) $(SIM_DIR)
+	rm -rf $(SIM_DIR)/scenarios
+	rm -rf $(SIM_DIR)/results
+	rm -rf $(SIM_DIR)/data
+	rm -rf $(SIM_DIR)/figs
+	mkdir -p $(SIM_DIR)/scenarios
+	mkdir -p $(SIM_DIR)/results
+	@echo "Parsing simulation YAML file and environment variables.."
+	python scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
+
+run_minikube:
+	minikube start --mount --mount-string="$(pwd)/logs:/logs"
+	kubectl label nodes minikube workerNode=yes
+
+run_simulations: init_simulations
+	./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME)
+
+run_simulations_background: init_simulations
+	rm -rf $(LOG_FILE)
+	@echo "Running simulations in the background.."
+	@echo "You can check the current progress on $(LOG_FILE)"
+	screen -A -m -d -S v2x-sims ./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME) $(LOG_FILE) &
+
+aggregate_logs:
+	python scripts/log_aggregator.py $(LOG_DIR) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)

@@ -30,4 +30,4 @@ spec:
       volumes:
       - name: nfs
         hostPath:
-          path: /mnt/nfs-disk-2/v2x
+          path: {LOG_DIR}

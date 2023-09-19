@@ -9,7 +9,7 @@ do
     VALUE=$(echo $var | cut -d "=" -f2)
     #echo $KEY $VALUE
 
-    FILE=$(echo "$FILE" | sed s/{$KEY}/$VALUE/)
+    FILE=$(echo "$FILE" | sed "s:{$KEY}:$VALUE:")
 done
 
 #echo "$FILE"

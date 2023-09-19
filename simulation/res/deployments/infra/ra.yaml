@@ -50,7 +50,7 @@ spec:
             path: ra_private.pem
       - name: nfs
         hostPath:
-          path: /mnt/nfs-disk-2/v2x
+          path: {LOG_DIR}
 ---
 apiVersion: v1
 kind: Service
