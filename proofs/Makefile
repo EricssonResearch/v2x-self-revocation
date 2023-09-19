@@ -23,7 +23,6 @@ clean:
 	@docker rm $(NAME) || true
 
 __create_out:
-	@rm -rf $(OUT_FOLDER)
 	@mkdir -p $(OUT_FOLDER)
 	@chmod o+rw $(OUT_FOLDER)
 	@cp $(MODEL)/theory.spthy $(OUT_FOLDER)

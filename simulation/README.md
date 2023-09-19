@@ -1,20 +1,85 @@
-# End-to-end simulation
+# Simulation of a V2X scenario with self-revocation
 
-Simulations can run using either Docker Compose or Kubernetes. The
-[.env](./.env) file contains a list of all configurable parameters.
+We implemented a simulated V2X scenario where vehicles communicate on an edge
+area via broadcast messages. The infrastructure manages enrollment to the
+network (via an Issuer) and revocation (via a Revocation Authority (RA)).
 
-**NOTE:** Python3 with the
-[cryptography](https://pypi.org/project/cryptography/) package is required to
-run the simulations, which can be installed by running `pip install
-cryptography`.
+Simulations can run using either Docker Compose or Kubernetes. Below, we provide
+instructions for running on a Kubernetes cluster.
+
+## Prerequisites
+
+We require a Linux-based operating system running a recent Linux distribution.
+We tested our code on Ubuntu 22.04, but other recent distros should work as
+well. Python 3 needs to be installed on the machine.
+
+1. Install Python dependencies: `pip3 install -r scripts/requirements` 
+    - We recommend using a [virtual environment](https://docs.python.org/3/library/venv.html)
+2. Install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+
+## Kubernetes cluster setup
+
+Here you can choose to run the application on an existing Kubernetes cluster or
+to setup a local cluster, e.g., using
+[Minikube](https://minikube.sigs.k8s.io/docs/).
+
+### Existing cluster
+
+If you have an existing cluster already running, make sure it is reachable via
+`kubectl`.
+
+All our Deployment specifications have a `nodeSelector` that ensures that pods
+are only deployed on nodes with the `workerNode: "yes"` label. Therefore, make
+sure to either (1) set a label to each node you want to use for the application
+using the `kubectl label nodes` command, or (2) remove the node selector from
+the specifications in `res`.
+
+**NOTE 1:** Our application uses multicast for communication between
+vehicles. However, not all Kubernetes network plugin support this feature. In
+order to run our application correctly, make sure your network plugin supports
+multicast. As far as we know,
+[Calico](https://docs.tigera.io/calico/3.25/reference/faq#can-calico-do-ip-multicast)
+*does not* support multicast, but [Weave
+net](https://www.weave.works/docs/net/latest/install/) does.
+
+**NOTE 2:** To compute average revocation times shown in our paper, each
+component logs to a file each action performed (with a timestamp). These files
+are automatically collected by our scripts after the simulation ends. Our
+scripts assume that all K8s nodes and the host share a volume, where logs will
+be stored. This volume can be specified by setting the `LOG_DIR_MOUNT` and
+`LOG_DIR_LOCAL` variables in the Makefile. If, however, there is no such shared
+volume, logs must be collected separately for each pod and put under
+`LOG_DIR_LOCAL` before calling `log_aggregator.py`.
+
+### Minikube
+
+Our application can be easily deployed locally using Minikube, which is a tool
+that sets up a local fully-configured Kubernetes cluster with only one node. Our
+scripts and Makefile should support such a deployment without requiring any
+changes.
+
+To set up a minikube cluster, first make sure
+[Docker](https://docs.docker.com/engine/install/ubuntu/) is correctly installed
+(you can verify this by running `docker run --rm hello-world`). Then, [install
+Minikube](https://minikube.sigs.k8s.io/docs/start/).
+
+Then, run `make run_minikube` to start the Minikube instance and set up the
+node.
+
+## Test
+
+The [.env](./.env) file contains a list of all configurable parameters.
 
 A visual representation of the simulation is provided by the `web` component,
 which runs a web server on port 80. This is a pretty simple web app that is only
 intended for demonstrative purposes, and for best results it is recommended to
 not exceed 30-40 virtual vehicles and 10 groups in total, and no more than 16
-vehicles per group on average. The web application is exposed on port 8080 in
-Docker Compose, while port forwarding can be used in Kubernetes via the `make
-port_forward` command.
+vehicles per group on average. The web application can be exposed locally on
+port 8080 via the `make port_forward` command.
+
+## Setup cluster
+
+`825` millicores and `288` MiB
 
 ## Quick start with Docker Compose
 

@@ -89,7 +89,7 @@ init_simulations:
 	mkdir -p $(SIM_DIR)/scenarios
 	mkdir -p $(SIM_DIR)/results
 	@echo "Parsing simulation YAML file and environment variables.."
-	python scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
+	python3 scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
 
 run_minikube:
 	minikube start --mount --mount-string="$(LOG_DIR_LOCAL):$(LOG_DIR_MOUNT)"
@@ -106,13 +106,13 @@ run_simulations_background: init_simulations
 	screen -r v2x-sims -X colon "logfile flush 0.001^M"
 
 aggregate_logs:
-	python scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
+	python3 scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
 
 plot:
-	python scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
+	python3 scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
 
 plot_all:
-	python scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
-	python scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
-	python scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smarter,blind,smarter-prl
-	python scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smarter,blind,smarter-prl
+	python3 scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
+	python3 scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
+	python3 scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smarter,blind,smarter-prl
+	python3 scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smarter,blind,smarter-prl

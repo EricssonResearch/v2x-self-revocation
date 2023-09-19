@@ -20,7 +20,7 @@ jobs:
         cd simulation
         make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
     -
-      name: Run Scenario A1
+      name: Run Scenario A1 (4 runs x 10 min)
       run: |
         cd simulation
         make run_simulations SCENARIO=scenario-a1 SIM_TIME=600 DOWN_TIME=60
@@ -44,17 +44,17 @@ jobs:
       name: Run main design (centralized-time)
       run: |
         cd proofs
-        make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4 OUT_FILE=res_centralized.spthy
+        make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4 OUT_FILE=output_centralized.spthy
         while docker ps --filter name=tamarin | grep tamarin ; do sleep 1; done
-        docker logs -n 200 tamarin
+        docker logs -n 200 tamarin > out/log_centralized.txt
       timeout-minutes: 10
     -
       name: Run alternative design (distributed-time)
       run: |
         cd proofs
-        make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4 OUT_FILE=res_distributed.spthy
+        make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4 OUT_FILE=output_distributed.spthy
         while docker ps --filter name=tamarin | grep tamarin ; do sleep 1; done
-        docker logs -n 200 tamarin
+        docker logs -n 200 tamarin > out/log_distributed.txt
       timeout-minutes: 10
     - 
       name: Upload results
