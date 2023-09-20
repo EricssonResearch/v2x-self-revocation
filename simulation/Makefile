@@ -16,8 +16,6 @@ DOCKER_TOKEN    ?=
 VERSION         ?= $(shell cat $(ENV_FILE) | grep VERSION | cut -d "=" -f2)
 NUM_VEHICLES    ?= $(shell cat $(ENV_FILE) | grep NUM_VEHICLES | cut -d "=" -f2)
 NUM_ATTACKERS   ?= $(shell cat $(ENV_FILE) | grep NUM_ATTACKERS | cut -d "=" -f2)
-NUM_GROUPS      ?= $(shell cat $(ENV_FILE) | grep NUM_GROUPS | cut -d "=" -f2)
-ATTACKER_LEVEL  ?= $(shell cat $(ENV_FILE) | grep ATTACKER_LEVEL | cut -d "=" -f2)
 
 SIM_TIME        ?= $(shell cat $(ENV_FILE) | grep SIM_TIME | cut -d "=" -f2)
 DOWN_TIME       ?= $(shell cat $(ENV_FILE) | grep DOWN_TIME | cut -d "=" -f2)
