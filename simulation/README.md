@@ -105,14 +105,18 @@ Compose](https://docs.docker.com/compose/install/linux/#install-using-the-reposi
 # Build application from source
 make build
 
-# Run application locally with Docker compose for debugging
+# Run application locally with Docker compose
 make run_docker
 ```
 
 Check [docker-compose.yml](./docker-compose.yml) and the [.env](./.env) file for
 more details.
 
-**NOTE:** to run your freshly built images on Kubernetes (see below), you need
+**NOTE 1:** With Docker Compose, the application might not be able to run
+correctly due to multicast not being properly supported. We recommend running
+with docker only to verify that all containers start correctly. 
+
+**NOTE 2:** to run your freshly built images on Kubernetes (see below), you need
 to either (1) build the images on _each_ node, or (2)  push them to a container
 registry, e.g., Docker Hub. You will also need to update the resource files
 under `res/` accordingly, to point to your images.
