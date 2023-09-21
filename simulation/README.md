@@ -37,35 +37,12 @@ See Section VII-A of our paper for more information.
 
 We require a Linux-based operating system running a recent Linux distribution.
 We tested our code on Ubuntu 22.04, but other recent distros should work as
-well. Python 3 needs to be installed on the machine.
+well. Python>=3.6 needs to be installed on the machine.
 
 1. Install Python dependencies: `pip3 install -r scripts/requirements` 
     - We recommend using a [virtual environment](https://docs.python.org/3/library/venv.html)
 2. Install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
 3. Install `screen` (needed to run simulations in background): `sudo apt install screen`
-
-## (Optional) Build application from source
-
-**NOTE:** This step is not necessary to run the evaluation. Pre-built images are
-available on [Docker Hub](https://hub.docker.com/u/selfrevocation).
-
-The application can be built and ran locally using [Docker
-Compose](https://docs.docker.com/compose/install/linux/#install-using-the-repository):
-
-```bash
-# Build application from source
-make build
-
-# Run application locally with Docker compose for debugging
-make run_docker
-```
-
-Check [docker-compose.yml](./docker-compose.yml) and the [.env](./.env) file for
-more details.
-
-**NOTE:** to run your freshly built images on Kubernetes (see below), you need
-to push them to a container registry, e.g., Docker Hub. You will also need to
-update the resource files under `res/` accordingly, to point to your images.
 
 ## Kubernetes cluster setup
 
@@ -115,6 +92,48 @@ Minikube](https://minikube.sigs.k8s.io/docs/start/).
 
 Then, run `make run_minikube` to start the Minikube instance and set up the
 node.
+
+## (Optional) Build application from source
+
+**NOTE:** This step is not necessary to run the evaluation. Pre-built images are
+available on [Docker Hub](https://hub.docker.com/u/selfrevocation).
+
+The application can be built and ran locally using [Docker
+Compose](https://docs.docker.com/compose/install/linux/#install-using-the-repository):
+
+```bash
+# Build application from source
+make build
+
+# Run application locally with Docker compose for debugging
+make run_docker
+```
+
+Check [docker-compose.yml](./docker-compose.yml) and the [.env](./.env) file for
+more details.
+
+**NOTE:** to run your freshly built images on Kubernetes (see below), you need
+to either (1) build the images on _each_ node, or (2)  push them to a container
+registry, e.g., Docker Hub. You will also need to update the resource files
+under `res/` accordingly, to point to your images.
+
+### Minikube
+
+For Minikube, follow the steps below to use your local images when running the
+application:
+
+```bash
+# Use the docker daemon from Minikube
+eval $(minikube docker-env)
+
+# Build images
+make build
+```
+
+This will build the images with the Minikube docker daemon, such that they will
+be available on the Minikube node when running the application. Since all the
+`Deployment` resources have `imagePullPolicy: IfNotPresent`, Kubernetes will not
+pull the images from Docker Hub but rather use the local ones.
 
 ## Test
 
