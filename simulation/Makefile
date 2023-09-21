@@ -71,9 +71,6 @@ clean:
 	kubectl delete ns v2x || true
 	rm -rf cred
 
-zip:
-	zip -r simulation.zip res/ src/ .env docker-compose.yml Makefile README.md simulation.yaml scripts/check_infra.sh scripts/deploy.sh scripts/gen_keys.py
-
 init_simulations:
 	@echo "Initializing folders.."
 	sudo rm -rf $(LOG_DIR_LOCAL)/*

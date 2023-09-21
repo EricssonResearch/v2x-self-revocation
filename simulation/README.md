@@ -1,13 +1,14 @@
 # Simulation of a V2X scenario with self-revocation
 
+This folder contains instructions to run our simulation artifacts with
+Kubernets, to reproduce the results of Section VII and Appendix C of our
+paper.
+
+## Short description of the application
+
 We implemented a simulated V2X scenario where vehicles communicate on an edge
 area via broadcast messages. The infrastructure manages enrollment to the
 network (via an Issuer) and revocation (via a Revocation Authority (RA)).
-
-Simulations can run using either Docker Compose or Kubernetes. Below, we provide
-instructions for running on a Kubernetes cluster.
-
-## Short description of the application
 
 This simulation has the purpose to evaluate our revocation scheme only. As such,
 many parts of the V2X protocol (enrollment, pseudonym generation, etc.) are
@@ -18,7 +19,11 @@ simplified and only consists in reporting a pseudonym to the RA via an API, who
 eventually manndates the revocation of the pseudonym once a certain number to
 reports has been collected.
 
-The simulation spawns a single edge area within which vehicles can "move". The area is divided in one or more groups, and movement consists in simply passing from one group to another. Vehicles in the same group are "close" to each other, and can communicate via multicast. As such, vehicles from different groups cannot communicate to each other.
+The simulation spawns a single edge area within which vehicles can "move". The
+area is divided in one or more groups, and movement consists in simply passing
+from one group to another. Vehicles in the same group are "close" to each other,
+and can communicate via multicast. As such, vehicles from different groups
+cannot communicate to each other.
 
 Each component is implemented in Python, except for the TC which was implement
 in Go. As the TC in the real worl should run in a trusted execution environment,
@@ -38,6 +43,29 @@ well. Python 3 needs to be installed on the machine.
     - We recommend using a [virtual environment](https://docs.python.org/3/library/venv.html)
 2. Install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
 3. Install `screen` (needed to run simulations in background): `sudo apt install screen`
+
+## (Optional) Build application from source
+
+**NOTE:** This step is not necessary to run the evaluation. Pre-built images are
+available on [Docker Hub](https://hub.docker.com/u/selfrevocation).
+
+The application can be built and ran locally using [Docker
+Compose](https://docs.docker.com/compose/install/linux/#install-using-the-repository):
+
+```bash
+# Build application from source
+make build
+
+# Run application locally with Docker compose for debugging
+make run_docker
+```
+
+Check [docker-compose.yml](./docker-compose.yml) and the [.env](./.env) file for
+more details.
+
+**NOTE:** to run your freshly built images on Kubernetes (see below), you need
+to push them to a container registry, e.g., Docker Hub. You will also need to
+update the resource files under `res/` accordingly, to point to your images.
 
 ## Kubernetes cluster setup
 
@@ -188,14 +216,15 @@ simulation ran for ~2 hours and spawned 360 "honest" vehicles and 40 "malicious"
 vehicles, and each used a different set of parameters for `T_V`, and
 `TRUSTED_TIME` (see [below](#parameters) for more info on these parameters).
 
-The table below, analogously to Table III in Appendix B, summarizes the setup of
+The table below, analogously to Table III in Appendix C, summarizes the setup of
 each scenario of the simulation:
 
 | Scenario     | Link to paper       | Parameters                   |
+|--------------|---------------------|------------------------------|
 | Scenario A1  | Fig. 5, Sect. VII-A | `T_V=30`, `TRUSTED_TIME=0`   |
-| Scenario A2  | Fig. 12, Appendix B | `T_V=150`, `TRUSTED_TIME=0`  |
-| Scenario A1  | Fig. 13, Appendix B | `T_V=30`, `TRUSTED_TIME=1`   |
-| Scenario A1  | Fig. 14, Appendix B | `T_V=150`, `TRUSTED_TIME=1`  |
+| Scenario A2  | Fig. 12, Appendix C | `T_V=150`, `TRUSTED_TIME=0`  |
+| Scenario A1  | Fig. 13, Appendix C | `T_V=30`, `TRUSTED_TIME=1`   |
+| Scenario A1  | Fig. 14, Appendix C | `T_V=150`, `TRUSTED_TIME=1`  |
 
 Additionally, each scenario ran four different simulations, each using a
 different attacker level. See Sect VII-A of our paper for more information on
@@ -280,17 +309,17 @@ make plot_all
 ```
 
 _A note on results:_ It is rather unlikely that you will reproduce _exactly_ the
-results in our paper. Of course, "effective" revocation times are subject to a
-large number of factors, including some randomness (e.g., the RSU that randomly
+results shown in our paper. Of course, revocation times are subject to a large
+number of factors, including some randomness (e.g., the RSU that randomly
 drops/delay heartbeats, the reporter that randomly replays V2V messages, etc.).
-You should however be able to see _similar_ results. In any case, you should
-notice that *none* of the values in the box plots goes after the `T_eff`
-threshold: this is guaranteed by our formal verification work (see Sect. VI).
+In any case, you should be able to notice that *none* of the values in the box
+plots goes after the `T_eff` threshold: this is guaranteed by our formal
+verification work (see Sect. VI).
 
 We provide reference outputs from our simulations that can exactly reproduce the
 plots in the paper. These are shown under
-[reference-outputs](./reference-outputs). Plots can be recomputed by running the
-command below.
+[reference-outputs](./reference-outputs). Plots can be re-computed by running
+the command below.
 
 ```bash
 # Recompute plots from reference outputs
