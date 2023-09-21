@@ -135,7 +135,7 @@ def boxplot(data, t_v, t_rev, t_eff):
     plot.axvline(0, color="black")
     plt.text(0 - 3.5, -0.58, "$REVOKE$")
 
-    plot.axvline(t_v, color="black")
+    plot.axvline(t_v, color="black", alpha=0.2)
     plt.text(t_v - 1, -0.58, "$T_{v}$")
 
     plot.axvline(t_eff, color="black")

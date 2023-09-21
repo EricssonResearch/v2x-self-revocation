@@ -9,7 +9,24 @@ instructions for running on a Kubernetes cluster.
 
 ## Short description of the application
 
+This simulation has the purpose to evaluate our revocation scheme only. As such,
+many parts of the V2X protocol (enrollment, pseudonym generation, etc.) are
+greatly simplified. Instead, V2V communication is protected using pseudonym
+identifier and digital signatures, similar to the current state of the art,
+while revocation implements our scheme. Misbehavior detection, however, is also
+simplified and only consists in reporting a pseudonym to the RA via an API, who
+eventually manndates the revocation of the pseudonym once a certain number to
+reports has been collected.
 
+The simulation spawns a single edge area within which vehicles can "move". The area is divided in one or more groups, and movement consists in simply passing from one group to another. Vehicles in the same group are "close" to each other, and can communicate via multicast. As such, vehicles from different groups cannot communicate to each other.
+
+Each component is implemented in Python, except for the TC which was implement
+in Go. As the TC in the real worl should run in a trusted execution environment,
+this allows running the TC in an Intel SGX enlave without code changes, using
+the [EGo](https://www.edgeless.systems/products/ego/) framework. This, however,
+requires proper hardware and is beyond the scope of our simulation.
+
+See Section VII-A of our paper for more information.
 
 ## Prerequisites
 
@@ -20,6 +37,7 @@ well. Python 3 needs to be installed on the machine.
 1. Install Python dependencies: `pip3 install -r scripts/requirements` 
     - We recommend using a [virtual environment](https://docs.python.org/3/library/venv.html)
 2. Install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+3. Install `screen` (needed to run simulations in background): `sudo apt install screen`
 
 ## Kubernetes cluster setup
 
@@ -163,46 +181,120 @@ Kubernetes network plugin or restarting your Minikube cluster.
 To shut down the application, simply run `make clean` again and the `v2x`
 namespace will be deleted along with all its resources.
 
-## Setup cluster
+## Reproduce our results
 
-`825` millicores and `288` MiB
+To reproduce the results of our paper, we ran several simulations. Each
+simulation ran for ~2 hours and spawned 360 "honest" vehicles and 40 "malicious"
+vehicles, and each used a different set of parameters for `T_V`, and
+`TRUSTED_TIME` (see [below](#parameters) for more info on these parameters).
 
-## Quick start with Docker Compose
+The table below, analogously to Table III in Appendix B, summarizes the setup of
+each scenario of the simulation:
 
-This requires a recent version of [Docker](https://docs.docker.com/get-docker/)
-with the [Compose](https://docs.docker.com/compose/install/) plugin.
+| Scenario     | Link to paper       | Parameters                   |
+| Scenario A1  | Fig. 5, Sect. VII-A | `T_V=30`, `TRUSTED_TIME=0`   |
+| Scenario A2  | Fig. 12, Appendix B | `T_V=150`, `TRUSTED_TIME=0`  |
+| Scenario A1  | Fig. 13, Appendix B | `T_V=30`, `TRUSTED_TIME=1`   |
+| Scenario A1  | Fig. 14, Appendix B | `T_V=150`, `TRUSTED_TIME=1`  |
 
-```bash
-# run simulation
-make run_docker
+Additionally, each scenario ran four different simulations, each using a
+different attacker level. See Sect VII-A of our paper for more information on
+attacker levels.
 
-# cleanup - after pressing CTRL-C
-make clean
-```
+### Configure simulations
 
-## Quick start with Kubernetes
+We provide scripts to completely automate the simulations. The
+[simulation.yaml](./simulation.yaml) can be used to describe the simulations to
+run, and can be customized according to one's needs. The `scenarios` list sets
+up the correct parameters for each scenario, while the `runs` list describes the
+simulations to run, associating them to each scenario.
 
-This requires a running [Kubernetes](https://kubernetes.io/) cluster reachable
-with `kubectl`. A [minikube](https://minikube.sigs.k8s.io/docs/) environment
-also works.
+The file is already configured with the correct parameters for each
+run/scenario. However, you can customize the number of vehicles and groups in
+each scenario according to your preference and (especially) your hardware.
 
-**NOTE 1:** Pods use multicast for communication. Therefore, make sure your
-Kubernetes network plugin supports multicast in order to run the simulation
+In our setup, we ran 400 vehicles over 8 nodes, which is infeasible if running
+the cluster locally on one single node, e.g., with Minikube. However, the
+simulation can be scaled down according to your available resources, while still
+getting meaningful results.
+
+The "single" components of our application (e.g., `issuer`, `ra`, etc.) in total
+use `825` millicores and `288` MiB of memory, while each vehicle (honest or not)
+requires `75` millicores and `96` MiB of memory. For a commodity desktop machine
+with a x86-64 CPU with 8 cores and 16 GB of RAM, it would be _theoretically_
+possible to run ~98 vehicles, but we highly recommend staying between 20-50
+vehicles in total (i.e., `NUM_VEHICLES` + `NUM_ATTACKERS`).
+
+### Run simulations
+
+Below, we describe the commands to run one or more simulations. Make sure your
+cluster is up and running, and the `simulation.yaml` file is configured
 correctly.
 
-**NOTE 2:** pods are configured to run on K8s nodes with label `workerNode=yes`.
-So, either make sure nodes have such label or remove this restriction from the
-resource files.
+Simulations can be executed via the `make run_simulations` command, which runs a
+script in foreground that manages each simulation automatically. Alternatively,
+the `make run_simulations_background` command runs the script in the background
+using the `screen` tool. Simulation times can be defined by passing as input to
+the targets `SIM_TIME`, expressed in seconds. Additionally, `DOWN_TIME`
+specifies the time needed to shut down the application, and is used to prevent
+bias when gathering the data.
+
+The more each simulation runs, the more data is gathered. Although we ran each
+simulation for around 2 hours, this is not necessary for reproducing our
+results. However, we highly recommend setting simulation times no less than
+10-20 minutes for each simulation.
+
+To run only simulations from a specific scenario, you can set the `SCENARIO`
+variable in the `make run_simulations` command. This is useful if, for example,
+you want to reproduce only the results of the main paper (i.e.,
+`SCENARIO=scenario-a1`). Additionally, setting `RUN` will restrict the
+simulations to a specific run.
+
+When running simulations, we recommend using `run_simulations_background` such
+that you do not have to keep your shell (or SSH connection) open the whole time.
+The script will continue to run on a separate `screen` session until the end.
 
 ```bash
-# (if minikube) add label to node
-kubectl label nodes minikube workerNode=yes
-
-# run simulation. All resources are deployed in the `v2x` namespace
-make run_kubernetes
-
-# cleanup
+# Clean up resources from earlier runs, just to be sure
 make clean
+
+# Test - run only the first simulation for 2 minutes to ensure everything works
+# Wait until the end -- after a couple of minutes, the scripts should
+make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
+```
+
+### Plotting results
+
+Results of simulations are automatically computed from application logs, and
+shown under `simulations/`. A separate `make plot` command can be used for
+plotting results.
+
+```bash
+# Plot results of scenario 1
+# NOTE: the `PLOTS` variable specifies the attacker levels that will appear in the plot
+#       This assumes that a simulation for each attacker level has been run
+make plot SCENARIO=scenario-a1 PLOTS=honest,smart,blind,smart-prl
+
+# Plot all results (assuming that all simulations for all scenarios have been run correctly)
+make plot_all
+```
+
+_A note on results:_ It is rather unlikely that you will reproduce _exactly_ the
+results in our paper. Of course, "effective" revocation times are subject to a
+large number of factors, including some randomness (e.g., the RSU that randomly
+drops/delay heartbeats, the reporter that randomly replays V2V messages, etc.).
+You should however be able to see _similar_ results. In any case, you should
+notice that *none* of the values in the box plots goes after the `T_eff`
+threshold: this is guaranteed by our formal verification work (see Sect. VI).
+
+We provide reference outputs from our simulations that can exactly reproduce the
+plots in the paper. These are shown under
+[reference-outputs](./reference-outputs). Plots can be recomputed by running the
+command below.
+
+```bash
+# Recompute plots from reference outputs
+make plot_all SIM_DIR=reference-outputs/
 ```
 
 ## Parameters
