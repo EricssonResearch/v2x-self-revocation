@@ -91,7 +91,18 @@ To set up a minikube cluster, first make sure
 Minikube](https://minikube.sigs.k8s.io/docs/start/).
 
 Then, run `make run_minikube` to start the Minikube instance and set up the
-node.
+node. _Note:_ the `LOG_DIR_LOCAL` (default `./logs`) will be mounted to the
+Minikube instance. Do *not* delete this folder until you are done with all the
+simulations, otherwise it will not be possible to collect the logs.
+
+**NOTE:** Make sure you have enough resources to run Minikube. You can specify
+number of CPUs and amount of memory by overriding the `MINIKUBE_CPUS` and
+`MINIKUBE_MEMORY` variables. By default, the Makefile is configured to use all
+the CPUs and half the memory in your machine. In general we recommend _not_ to
+go below 4 CPUs and 4 GB of memory.
+
+When you are done with all the simulations, you can run `make clean_minikube` to
+delete the instance and remove the logs directory.
 
 ## (Optional) Build application from source
 
@@ -163,20 +174,40 @@ make clean
 make run_kubernetes
 ```
 
-The `run_kubernetes` command sets up a `v2x` namespace and configure environment
-variables and other resources. After that, it deploys the application in order:
-firstly, the infrastructural components `issuer`, `ra`, `rsu` and `web`;
-secondly, `reporter` and the vehicles `vehicle` and `attacker`. In the first
-run, it may take some time to deploy all containers (the nodes need to pull all
-the container images). If everything goes well, eventually all the pods should
-reach the `Running` state:
+The `run_kubernetes` command sets up a `v2x` namespace and configures
+environment variables and other resources. After that, it deploys the
+application in order: firstly, the infrastructural components `issuer`, `ra`,
+`rsu` and `web`; secondly, `reporter` and the vehicles `vehicle` and `attacker`.
+In the first run, it may take some time to deploy all containers (the nodes need
+to pull all the container images). If everything goes well, eventually all the
+pods should reach the `Running` state:
 
 ```bash
-# Check state of pods: they should go to the `Running` state eventually
+# Check state of pods: they should all reach the `Running` state after some seconds
 kubectl -n v2x get pods
 ```
 
 ![pods](./imgs/pods.PNG)
+
+### Check logs
+
+Each pod writes logs on the `LOG_DIR_LOCAL` folder (default: `./logs`). Before
+continuing, we will check that these logs are stored correctly. This is
+necessary for computing the results later on.
+
+```bash
+# save log directory to variable -- set the correct path if you used a different one
+LOG_DIR=./logs
+
+# Check if logs exist: you should see one log file for each pod
+ls -la $LOG_DIR
+
+# Check the log file of the attacker's TC: you should see a bunch of events such
+# as JOIN, SIGN, VERIFY, HEARTBEAT, etc.
+cat $LOG_DIR/`ls $LOG_DIR -1 | grep attacker.*tc`
+```
+
+![logs](./imgs/logs.PNG)
 
 ### Use the web interface
 
@@ -185,7 +216,7 @@ which runs a web server on port 80. This is a pretty simple web app that is only
 intended for demonstrative purposes, and for best results it is recommended to
 not exceed 30-40 virtual vehicles and 10 groups in total, and no more than 16
 vehicles per group on average. The web application can be exposed locally on
-port 8080 via the `make port_forward` command:
+port 8080 via the `make port_forward` command (run this on a separate shell):
 
 ```bash
 # Expose the web interface locally on port 8080
@@ -203,8 +234,7 @@ Each circle represents a _pseudonym_, and can have different colors:
   of an attacker)
 - Red: malicious (i.e., belonging to a "attacker" vehicle) 
 
-Shaded rectangles show different groups, in our case only two of them should
-contain pseudonyms.
+Shaded rectangles show different groups, in our case only two of them are used.
 
 Even if we deployed only 5 vehicles, you may see more than 5 circles in the map,
 because the map shows _pseudonyms_ ant not vehicles: In fact, in our
@@ -212,10 +242,11 @@ configuration each vehicle has two concurrent pseudonyms. Our map simulates a
 _passive observer_ that can only see network messages but cannot infer which
 pseudonym belongs to which vehicle.
 
-The web interface shows the situation of the application each second, and allows
-pausing or going back to a previous time frame. Additionally, pseudonyms can be
-manually reported (and consequently _revoked_) by simply clicking on the circles
-in the map.
+The web interface shows the situation of the application at each time step
+(i.e., a second), and allows pausing or going back to a previous step.
+Additionally, pseudonyms can be manually reported (and consequently _revoked_)
+by simply clicking on the circles in the map. In such case, the circle will
+become blue and eventually it should disappear.
 
 **NOTE:** If you cannot see any circles even though the application seems
 running normally (i.e., all pods are in a `Running` state), it is most likely

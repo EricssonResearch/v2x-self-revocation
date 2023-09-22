@@ -12,8 +12,8 @@ jobs:
       name: Setup
       run: |
         cd simulation
-        pip install -r scripts/requirements.txt
         make run_minikube
+        make build_minikube
     -
       name: Test run
       run: |

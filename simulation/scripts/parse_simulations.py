@@ -1,6 +1,5 @@
 import argparse
 import yaml
-import sys
 from os.path import join
 from jproperties import Properties
 

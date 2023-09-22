@@ -3,7 +3,7 @@
 set -e
 
 echo "Installing dependencies via apt.."
-sudo apt update && sudo apt install -y git make python3 python3-venv screen curl
+sudo apt update && sudo apt install -y git make screen curl
 
 echo "Getting Docker.."
 curl -fsSL https://get.docker.com -o get-docker.sh

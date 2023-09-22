@@ -8,6 +8,14 @@ RUN             ?=
 PLOTS			?= 
 PLOT_NAME		?= $(SCENARIO)
 
+MINIKUBE_CPUS   ?= $(shell nproc)
+MINIKUBE_MEMORY ?= $(shell expr `free -m | grep Mem: | awk '{print $$2}'` / 2)
+
+DOCKER_PYTHON   ?= selfrevocation/python
+
+# Set PYTHON to "python" to work locally
+PYTHON          ?= docker run --rm -v $(shell pwd):/usr/src/app $(DOCKER_PYTHON)
+
 ENV_FILE        ?= .env
 DOCKER_REGISTRY ?= docker.io
 DOCKER_USERNAME ?= selfrevocation
@@ -25,12 +33,19 @@ REPLICASET_ATTACKERS = $(shell kubectl describe deployment -n v2x attacker | gre
 
 mkdir:
 	mkdir -p cred
+	chmod o+rw cred
 
 gen_ra_key: mkdir
-	python3 scripts/gen_keys.py
+	$(PYTHON) scripts/gen_keys.py
 
 build:
 	docker compose build
+
+build_minikube:
+	./scripts/build.sh
+
+build_python_image:
+	docker build -t $(DOCKER_PYTHON) .
 
 run_docker: gen_ra_key
 	docker compose up --build --remove-orphans --force-recreate
@@ -66,16 +81,12 @@ check_pods:
 	kubectl describe replicaset -n v2x $(REPLICASET_VEHICLES) | grep Running
 	kubectl describe replicaset -n v2x $(REPLICASET_ATTACKERS) | grep Running
 
-clean:
-	docker compose down || true
-	kubectl delete ns v2x || true
-	rm -rf cred
-
 init_simulations:
 	@echo "Initializing folders.."
-	sudo rm -rf $(LOG_DIR_LOCAL)/*
+	rm -rf $(LOG_DIR_LOCAL)/*
 	test -f $(SIMULATION)
 	mkdir -p $(SIM_DIR)
+	chmod o+rw $(SIM_DIR)
 	cp -r $(SIMULATION) $(SIM_DIR)
 	rm -rf $(SIM_DIR)/scenarios
 	rm -rf $(SIM_DIR)/results
@@ -84,10 +95,12 @@ init_simulations:
 	mkdir -p $(SIM_DIR)/scenarios
 	mkdir -p $(SIM_DIR)/results
 	@echo "Parsing simulation YAML file and environment variables.."
-	python3 scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
+	$(PYTHON) scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
 
 run_minikube:
-	minikube start --mount --mount-string="$(LOG_DIR_LOCAL):$(LOG_DIR_MOUNT)"
+	mkdir -p $(LOG_DIR_LOCAL)
+	minikube start --mount --mount-string="$(LOG_DIR_LOCAL):$(LOG_DIR_MOUNT)" \
+		--cpus $(MINIKUBE_CPUS) --memory $(MINIKUBE_MEMORY) --driver=docker 
 	kubectl label nodes minikube workerNode=yes
 
 run_simulations: init_simulations
@@ -101,13 +114,24 @@ run_simulations_background: init_simulations
 	screen -r v2x-sims -X colon "logfile flush 0.001^M"
 
 aggregate_logs:
-	python3 scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
+	$(PYTHON) scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
 
 plot:
-	python3 scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
 
 plot_all:
-	python3 scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
-	python3 scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
-	python3 scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smarter,blind,smarter-prl
-	python3 scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smarter,blind,smarter-prl
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smarter,blind,smarter-prl
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smarter,blind,smarter-prl
+
+clean:
+	docker compose down || true
+	kubectl delete ns v2x > /dev/null 2>&1 || true
+	rm -rf cred $(LOG_DIR_LOCAL)/* $(SIM_DIR)
+
+clean_minikube:
+	minikube delete
+	rm -rf $(LOG_DIR_LOCAL)
+
+clean_all: clean clean_minikube
