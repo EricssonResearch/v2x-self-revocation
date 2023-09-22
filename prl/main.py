@@ -8,7 +8,6 @@ from rich import print
 from pandas import DataFrame
 from pathlib import Path
 
-from rich.pretty import pprint
 
 def draw_as_tikz(matrix, file):
     """

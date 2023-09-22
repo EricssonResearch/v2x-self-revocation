@@ -62,6 +62,9 @@ Since we did not optimize these scripts, they may hog resources. If you prefer
 to just let this run and com back later, of course feel free to run `make all`
 and check back after a few hours.
 
+By default, all plots will be saved to the `./plots` directory. You can override
+this by setting the `PLOT_DIR` variable when running the `make` commands.
+
 ### Setup
 
 The PRL scripts use a Docker container with Python 3.8 and all requirements
@@ -115,10 +118,7 @@ make tikz
 
 ### Cleanup
 
-Since we use Docker, the created files and folders belong to the root user and
-need root privileges to remove. We provide a `make clean` target that removes
-all generated files from inside docker as a convenient escalation-of-privilege
-helper on your machine :-).
+To delete all files (cache files and plots), simply run `make clean`.
 
 ## Local setup
 

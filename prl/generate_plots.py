@@ -1,23 +1,14 @@
-import math
-import os
+import asyncio
 import signal
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 import numpy as np
-import pandas
 import typer
 from rich import print
 from rich.progress import Progress
-from pandas import DataFrame
 from pathlib import Path
-from rich.progress import track
-import asyncio
-import time
 from datetime import datetime
-
-import asyncio
 
 app = typer.Typer(add_completion=False)
 
@@ -60,7 +51,11 @@ def main(
             0.1, "--p-step",
             help="Increment for p if p is not given multiple times. Then, behaves the same as n-step.",
         ),
-        path: Path = typer.Option(
+        cache_dir: Path = typer.Option(
+            'cached', "--cache-dir", help="Path to cache directory",
+            exists=False, dir_okay=True, readable=True, file_okay=False
+        ),
+        plot_dir: Path = typer.Option(
             'plots', "--path", help="Path to folder to write plots",
                 exists=False, dir_okay=True, file_okay=False, readable=True, writable=True,
         )
@@ -71,8 +66,8 @@ def main(
 
     print(f'Running main script for n=[{n},{n+n_max}], e=[{e},{e+e_max}], and p={p}')
     num_threads = (n_max) * (e_max)
-    print(f'Creating dir {str(path)}')
-    path.mkdir(parents=True, exist_ok=True)
+    print(f'Creating dir {str(plot_dir)}')
+    plot_dir.mkdir(parents=True, exist_ok=True)
 
     def shutdown():
         for task in asyncio.all_tasks():
@@ -113,8 +108,8 @@ def main(
                             f'-e {j} '
                             f'-p {k:.15f} '
                             f'-g '
-                            f'--plot-path=plots/{timestamp}-{task_counter}_n{i}_e{j}_p{k:.15f}.svg '
-                            f'--cache-dir=cached '
+                            f'--plot-path={plot_dir}/{timestamp}-{task_counter}_n{i}_e{j}_p{k:.15f}.svg '
+                            f'--cache-dir={cache_dir} '
                             f'--allow-cached',
                             stdout=subprocess.DEVNULL,
                             loop=loop)

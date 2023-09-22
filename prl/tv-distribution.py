@@ -28,9 +28,13 @@ def get_percentiles(percentiles_list, distribution):
 @app.command()
 def main(
         cache_dir: Path = typer.Option(
-            'cached', "--cache-dir", help="Path to cache result dict to",
+            'cached', "--cache-dir", help="Path to cache directory",
             exists=False, dir_okay=True, readable=True, file_okay=False
         ),
+        _: Path = typer.Option(
+            'plots', "--path", help="Path to folder to write plots",
+            exists=False, dir_okay=True, file_okay=False, readable=True, writable=True,
+        )
 ):
     # value of n (i.e., number of pseudonyms)
     n = 800

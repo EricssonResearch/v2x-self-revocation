@@ -17,13 +17,16 @@ jobs:
       run: |
         cd proofs
         make test
+        make clean
       timeout-minutes: 5
     -
       name: PRL
       run: |
         cd prl
-        pip install -r requirements.txt
         make test
+        make tikz
+        make clean
+
       timeout-minutes: 5
     -
       name: Simulation
@@ -32,4 +35,5 @@ jobs:
         pip install -r scripts/requirements.txt
         make build
         make test SIM_TIME=60
+        make clean
       timeout-minutes: 5

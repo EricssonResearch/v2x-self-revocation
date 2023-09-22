@@ -1,15 +1,11 @@
-import math
 import sys
+import os
 
-import numpy as np
 import typer
 from rich import print
-from pandas import DataFrame
 from pathlib import Path
-
-from rich.pretty import pprint
 import pickle
-import os
+
 app = typer.Typer(add_completion=False)
 
 
@@ -31,13 +27,21 @@ def get_percentiles(percentiles_list, distribution):
 @app.command()
 def main(
         cache_dir: Path = typer.Option(
-            'cached', "--cache-dir", help="Path to cache result dict to",
+            'cached', "--cache-dir", help="Path to cache directory",
             exists=False, dir_okay=True, readable=True, file_okay=False
         ),
+        plot_dir: Path = typer.Option(
+            'plots', "--path", help="Path to folder to write plots",
+            exists=False, dir_okay=True, file_okay=False, readable=True, writable=True,
+        )
 ):
     """
-    Generates the plot over the number of vehicles in the paper.
+    Generates the plot over the number of pseudonyms in the paper.
     """
+
+    # create plot_dir if not exists
+    print(f'Creating dir {str(plot_dir)}')
+    plot_dir.mkdir(parents=True, exist_ok=True)
 
     # pick a series
     n_start = 400
@@ -47,7 +51,7 @@ def main(
 
     e_range = [30]
 
-    print(f'I will plot for a range of number of vehicles in: {str(n_range)} and a range of possible time epochs (T_PRL) in: {str(e_range)}')
+    print(f'I will plot for a range of number of pseudonyms in: {str(n_range)} and a range of possible time epochs (T_PRL) in: {str(e_range)}')
 
     # p range for manual attackers
     honest1 = 0.000000116323325
@@ -122,10 +126,11 @@ def main(
 
     import tikzplotlib
     filename = f"n-plot_e{e_range[0]}"
-    tikzplotlib.save(filename + '.tex')
+    filename_path = os.path.join(plot_dir, filename)
+    tikzplotlib.save(filename_path + '.tex')
     plt.title(filename)
-    plt.savefig(filename + '.png')
-    print(f'Saved plot to {filename}[.tex, .png]')
+    plt.savefig(filename_path + '.png')
+    print(f'Saved plot to {filename_path}[.tex, .png]')
 
 if __name__ == "__main__":
     app()
