@@ -14,7 +14,7 @@ MINIKUBE_MEMORY ?= $(shell expr `free -m | grep Mem: | awk '{print $$2}'` / 2)
 DOCKER_PYTHON   ?= selfrevocation/python
 
 # Set PYTHON to "python" to work locally
-PYTHON          ?= docker run --rm -v $(shell pwd):/usr/src/app $(DOCKER_PYTHON)
+PYTHON          ?= docker run --rm -v $(shell pwd):/usr/src/app -v $(LOG_DIR_LOCAL):$(LOG_DIR_LOCAL) $(DOCKER_PYTHON)
 
 ENV_FILE        ?= .env
 DOCKER_REGISTRY ?= docker.io

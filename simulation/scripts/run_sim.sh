@@ -20,7 +20,7 @@ function run_simulation() {
     echo "SLEEPING"
     sleep $SIM_TIME
     echo "ENDING SIMULATION"
-    make clean
+    kubectl delete ns v2x
     echo "AGGREGATING LOGS"
     make aggregate_logs LOG_FILE=$LOG_FILE ENV_FILE=$ENV_FILE SIM_TIME=$SIM_TIME DOWN_TIME=$DOWN_TIME LOG_DIR_LOCAL=$LOG_DIR
 }
