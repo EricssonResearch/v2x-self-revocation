@@ -3,63 +3,36 @@
 This repository contains software artifacts for the paper _Efficient and Timely
 Revocation of V2X Credentials_ that will appear at NDSS Symposium 2024.
 
-## Artifct Abstract
-
-In Intelligent Transport Systems, secure communication between vehicles,
-infrastructure, and other road users is critical to maintain road safety.
-This includes the revocation of cryptographic credentials of misbehaving or
-malicious vehicles in a timely manner. However, current standards are vague
-about how revocation should be handled, and recent surveys suggest severe
-limitations in the scalability and effectiveness of existing revocation
-schemes. In our paper "Efficient and Timely Revocation of V2X Credentials"
-(NDSS 2024), we present a formally verified mechanism for self-revocation
-of Vehicle-to-Everything (V2X) pseudonymous credentials, which relies on a
-trusted processing element in vehicles but does not require a trusted time
-source. Our scheme is compatible with ongoing standardization efforts and
-is the first to guarantee the actual revocation of credentials with a
-predictable upper bound on revocation time and in the presence of realistic
-attackers. We further test our revocation mechanism in a virtual 5G-Edge
-deployment scenario where a large number of vehicles communicate with each
-other, simulating real-world conditions such as network malfunctions and
-delays. Our approach relies on Pseudony Revocation Lists (PRLs) and the
-process of adding and removing pseudonyms from PRLs can be represented as a
-finite state machine where the states are the possible sizes of the list,
-and a Markov model to describe the probability of moving from state to
-state. We use such a model to predict the size of PRLs and the related
-impact on the V2X system for differnt scenarios.
-
-This artifact submission contains the following sub-artifacts:
-
-- `proofs` contains the Tamarin models used to formally verify our
-  revocation scheme.
-- `simulation` containing the code used for our performance and scalability
-  evaluation based on simulaing realistic traffic scenarios.
-- `prl` contains scripts to generate and plot the markov matrices.
-
-
-## Paper Abstract
+## Artifact Abstract
 
 In Intelligent Transport Systems, secure communication between vehicles,
 infrastructure, and other road users is critical to maintain road safety. This
 includes the revocation of cryptographic credentials of misbehaving or malicious
 vehicles in a timely manner. However, current standards are vague about how
 revocation should be handled, and recent surveys suggest severe limitations in
-the scalability and effectiveness of existing revocation schemes. In this paper,
-we present a formally verified mechanism for self-revocation of
+the scalability and effectiveness of existing revocation schemes. In our paper
+"Efficient and Timely Revocation of V2X Credentials" (to appear at NDSS
+Symposium 2024), we present a formally verified mechanism for self-revocation of
 Vehicle-to-Everything (V2X) pseudonymous credentials, which relies on a trusted
 processing element in vehicles but does not require a trusted time source. Our
 scheme is compatible with ongoing standardization efforts and, leveraging the
 Tamarin prover, is the first to guarantee the actual revocation of credentials
 with a predictable upper bound on revocation time and in the presence of
-realistic attackers. We test our revocation mechanism in a virtual 5G-Edge
-deployment scenario where a large number of vehicles communicate with each
-other, simulating real-world conditions such as network malfunctions and delays.
-Results show that our scheme upholds formal guarantees in practice, while
-exhibiting low network overhead and good scalability.
+realistic attackers. We further test our revocation mechanism in a virtual
+5G-Edge deployment scenario where a large number of vehicles communicate with
+each other, simulating real-world conditions such as network malfunctions and
+delays. Our approach relies on distributing revocation information via so-called
+Pending Revocation Lists (PRLs) where, unlike classic Certificate Revocation
+Lists (CRLs), a pseudonym only needs to stay only for a short amount of time.
+The process of adding and removing pseudonyms from PRLs can be represented as a
+finite state machine where the states are the possible sizes of the list, and a
+Markov model to describe the probability of moving from state to state. We use
+such a model to predict the size of PRLs and the related impact on the V2X
+system for differnt scenarios.
 
 ## Structure
 
-The repository is structured into three parts:
+The repository contains the following sub-artifacts:
 
 - `prl`
    contains scripts to generate and plot the markov matrices 
@@ -72,7 +45,7 @@ The repository is structured into three parts:
    (Sec. VII-A / Appendix C)
 
 A README is also included on each individual folder containing instructions to
-run our artifacts.
+run the artifacts.
 
 ## Artifact Evaluation
 
@@ -93,7 +66,7 @@ artifacts generated as output.
 * [Getting started](#getting-started) (~10-30 human-minutes, ~15 compute-minutes)
 * [Kick-the-tires stage](#kick-the-tires-stage) (~8-10 human-minutes, ~14-16 compute-minutes)
 * [Tamarin models](#tamarin-models) (~2 human-minutes, ~10 compute-minutes)
-* [Simulations](#simulations) (~10-20 human-minutes, ~5 compute-hours)
+* [Simulations](#simulations) (~20-30 human-minutes, ~5 compute-hours)
 * [PRL evaluation](#prl-evaluation)
 
 ### Getting started
@@ -234,7 +207,7 @@ cd ..
 The steps for reproducing our results are the same as done in kick-the-tires
 stage, but this time we will ask Tamarin to verify _all_ lemmas.
 
-Each of the models should take around 5 compute-minutes to complete.
+In total, this evaluation should take around **10 minutes**.
 
 ```bash
 # go to the `proofs` folder
@@ -273,7 +246,8 @@ cd ..
 In order to run the simulations locally and within a few hours, we provide a
 scaled-down configuration that spawns 50 vehicles and runs all simulations in
 around **4.5 to 5 hours**. This configuration is described in the `conf/ae.yaml`
-file. For a more detailed description of this setup, [click
+file, and should provide _similar_ results compared to ours, although with much
+less collected data. For a more detailed description of this setup, [click
 here](./simulation/README.md#scaled-down-setups).
 
 Note: we recommend running the simulations when nothing else is running on the

@@ -37,4 +37,4 @@ jobs:
         make build_minikube
         make run_simulations CONF=conf/ci.yaml SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
         make clean_all
-      timeout-minutes: 5
+      timeout-minutes: 10
