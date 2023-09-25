@@ -20,45 +20,15 @@ runs:
     env:
       ATTACKER_LEVEL: honest
       TC_STORE_LAST_PRL: 0
-    scenarios:
-      - scenario-a1
-      - scenario-a2
-      - scenario-b1
-      - scenario-b2
   - name: 2-smart
-    env:
-      ATTACKER_LEVEL: smart
-      TC_STORE_LAST_PRL: 0
-    scenarios:
-      - scenario-a1
-      - scenario-a2
-  - name: 3-smarter
     env:
       ATTACKER_LEVEL: smarter
       TC_STORE_LAST_PRL: 0
-    scenarios:
-      - scenario-b1
-      - scenario-b2
-  - name: 4-blind
+  - name: 3-blind
     env:
       ATTACKER_LEVEL: blind
       TC_STORE_LAST_PRL: 0
-    scenarios:
-      - scenario-a1
-      - scenario-a2
-      - scenario-b1
-      - scenario-b2
-  - name: 6-smart-prl
+  - name: 4-smart-prl
     env:
       ATTACKER_LEVEL: smart
       TC_STORE_LAST_PRL: 1
-    scenarios:
-      - scenario-a1
-      - scenario-a2
-  - name: 7-smarter-prl
-    env:
-      ATTACKER_LEVEL: smarter
-      TC_STORE_LAST_PRL: 1
-    scenarios:
-      - scenario-b1
-      - scenario-b2
