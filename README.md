@@ -3,7 +3,41 @@
 This repository contains software artifacts for the paper _Efficient and Timely
 Revocation of V2X Credentials_ that will appear at NDSS Symposium 2024.
 
-## Abstract
+## Artifct Abstract
+
+In Intelligent Transport Systems, secure communication between vehicles,
+infrastructure, and other road users is critical to maintain road safety.
+This includes the revocation of cryptographic credentials of misbehaving or
+malicious vehicles in a timely manner. However, current standards are vague
+about how revocation should be handled, and recent surveys suggest severe
+limitations in the scalability and effectiveness of existing revocation
+schemes. In our paper "Efficient and Timely Revocation of V2X Credentials"
+(NDSS 2024), we present a formally verified mechanism for self-revocation
+of Vehicle-to-Everything (V2X) pseudonymous credentials, which relies on a
+trusted processing element in vehicles but does not require a trusted time
+source. Our scheme is compatible with ongoing standardization efforts and
+is the first to guarantee the actual revocation of credentials with a
+predictable upper bound on revocation time and in the presence of realistic
+attackers. We further test our revocation mechanism in a virtual 5G-Edge
+deployment scenario where a large number of vehicles communicate with each
+other, simulating real-world conditions such as network malfunctions and
+delays. Our approach relies on Pseudony Revocation Lists (PRLs) and the
+process of adding and removing pseudonyms from PRLs can be represented as a
+finite state machine where the states are the possible sizes of the list,
+and a Markov model to describe the probability of moving from state to
+state. We use such a model to predict the size of PRLs and the related
+impact on the V2X system for differnt scenarios.
+
+This artifact submission contains the following sub-artifacts:
+
+- `proofs` contains the Tamarin models used to formally verify our
+  revocation scheme.
+- `simulation` containing the code used for our performance and scalability
+  evaluation based on simulaing realistic traffic scenarios.
+- `prl` contains scripts to generate and plot the markov matrices.
+
+
+## Paper Abstract
 
 In Intelligent Transport Systems, secure communication between vehicles,
 infrastructure, and other road users is critical to maintain road safety. This
