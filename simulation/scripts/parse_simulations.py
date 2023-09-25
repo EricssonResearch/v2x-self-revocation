@@ -76,7 +76,8 @@ for run in conf["runs"]:
     if "scenarios" not in run:
         # all scenarios
         for scenario in conf["scenarios"]:
-            parse_scenario(run, scenario, env)
+            if requested_scenario is None or scenario['name'] == requested_scenario:
+                parse_scenario(run, scenario, env)
     else:
         for s in run["scenarios"]:
             scenario = find_scenario(conf["scenarios"], s)

@@ -19,16 +19,16 @@ scheme is compatible with ongoing standardization efforts and, leveraging the
 Tamarin prover, is the first to guarantee the actual revocation of credentials
 with a predictable upper bound on revocation time and in the presence of
 realistic attackers. We further test our revocation mechanism in a virtual
-5G-Edge deployment scenario where a large number of vehicles communicate with
-each other, simulating real-world conditions such as network malfunctions and
-delays. Our approach relies on distributing revocation information via so-called
-Pending Revocation Lists (PRLs) where, unlike classic Certificate Revocation
-Lists (CRLs), a pseudonym only needs to stay only for a short amount of time.
-The process of adding and removing pseudonyms from PRLs can be represented as a
-finite state machine where the states are the possible sizes of the list, and a
-Markov model to describe the probability of moving from state to state. We use
-such a model to predict the size of PRLs and the related impact on the V2X
-system for differnt scenarios.
+5G-Edge deployment scenario running on Kubernetes, where a large number of
+vehicles communicate with each other simulating real-world conditions such as
+network malfunctions and delays. Our approach relies on distributing revocation
+information via so-called Pending Revocation Lists (PRLs) where, unlike classic
+Certificate Revocation Lists (CRLs), a pseudonym only needs to stay for a
+limited time, needed to guarantee revocation. The process of adding and removing
+pseudonyms from PRLs can be represented as a finite state machine where the
+states are the possible sizes of the list, and a Markov model to describe the
+probability of moving from state to state. We use such a model to predict the
+size of PRLs and the related impact on the V2X system for different scenarios.
 
 ## Structure
 
