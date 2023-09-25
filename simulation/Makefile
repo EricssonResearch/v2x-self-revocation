@@ -1,6 +1,6 @@
 LOG_DIR_MOUNT   ?= /logs
 LOG_DIR_LOCAL   ?= $(shell pwd)/logs
-SIMULATION      ?= simulation.yaml
+CONF            ?= conf/paper.yaml
 SIM_DIR         ?= simulations
 LOG_FILE        ?= $(SIM_DIR)/out.log
 SCENARIO        ?=
@@ -25,8 +25,8 @@ VERSION         ?= $(shell cat $(ENV_FILE) | grep VERSION | cut -d "=" -f2)
 NUM_VEHICLES    ?= $(shell cat $(ENV_FILE) | grep NUM_VEHICLES | cut -d "=" -f2)
 NUM_ATTACKERS   ?= $(shell cat $(ENV_FILE) | grep NUM_ATTACKERS | cut -d "=" -f2)
 
-SIM_TIME        ?= $(shell cat $(ENV_FILE) | grep SIM_TIME | cut -d "=" -f2)
-DOWN_TIME       ?= $(shell cat $(ENV_FILE) | grep DOWN_TIME | cut -d "=" -f2)
+SIM_TIME        ?= -1
+DOWN_TIME       ?= -1
 
 REPLICASET_VEHICLES = $(shell kubectl describe deployment -n v2x vehicle | grep "replica set" | sed -r "s/ /\n/g" | grep "vehicle")
 REPLICASET_ATTACKERS = $(shell kubectl describe deployment -n v2x attacker | grep "replica set" | sed -r "s/ /\n/g" | grep "attacker")
@@ -84,10 +84,10 @@ check_pods:
 init_simulations:
 	@echo "Initializing folders.."
 	rm -rf $(LOG_DIR_LOCAL)/*
-	test -f $(SIMULATION)
+	test -f $(CONF)
 	mkdir -p $(SIM_DIR)
 	chmod o+rw $(SIM_DIR)
-	cp -r $(SIMULATION) $(SIM_DIR)
+	cp -r $(CONF) $(SIM_DIR)/simulation.yaml
 	rm -rf $(SIM_DIR)/scenarios
 	rm -rf $(SIM_DIR)/results
 	rm -rf $(SIM_DIR)/data
@@ -111,21 +111,29 @@ run_simulations_background: init_simulations
 	@echo "Running simulations in the background.."
 	@echo "You can check the current progress on $(LOG_FILE)"
 	screen -A -m -d -S v2x-sims -L -Logfile $(LOG_FILE) ./scripts/run_sim.sh $(SIM_DIR) $(SIM_TIME) $(DOWN_TIME) $(LOG_DIR_LOCAL) &
+	sleep 0.5
 	screen -r v2x-sims -X colon "logfile flush 0.001^M"
 
 aggregate_logs:
 	$(PYTHON) scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
 
 plot:
+	mkdir -p $(SIM_DIR)/figs
+	mkdir -p $(SIM_DIR)/tikz
+	mkdir -p $(SIM_DIR)/data
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
 
 plot_all:
+	mkdir -p $(SIM_DIR)/figs
+	mkdir -p $(SIM_DIR)/tikz
+	mkdir -p $(SIM_DIR)/data
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
-	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smarter,blind,smarter-prl
-	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smarter,blind,smarter-prl
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smart,blind,smart-prl
+	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b2 honest,smart,blind,smart-prl
 
 clean:
+	screen -XS v2x-sims quit || true
 	docker compose down || true
 	kubectl delete ns v2x > /dev/null 2>&1 || true
 	rm -rf cred $(LOG_DIR_LOCAL)/* $(SIM_DIR)
@@ -135,3 +143,12 @@ clean_minikube:
 	rm -rf $(LOG_DIR_LOCAL)
 
 clean_all: clean clean_minikube
+
+push_all: build
+	docker push $(DOCKER_USERNAME)/e2e-sim-issuer:$(VERSION)
+	docker push $(DOCKER_USERNAME)/e2e-sim-ra:$(VERSION)
+	docker push $(DOCKER_USERNAME)/e2e-sim-rsu:$(VERSION)
+	docker push $(DOCKER_USERNAME)/e2e-sim-tc:$(VERSION)
+	docker push $(DOCKER_USERNAME)/e2e-sim-obu:$(VERSION)
+	docker push $(DOCKER_USERNAME)/e2e-sim-reporter:$(VERSION)
+	docker push $(DOCKER_USERNAME)/e2e-sim-web:$(VERSION)

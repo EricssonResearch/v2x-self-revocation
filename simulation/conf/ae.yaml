@@ -1,0 +1,59 @@
+env:
+  NUM_GROUPS: 3
+  JOIN_MAX_DELAY: 5
+  NUM_PSEUDONYMS: 1
+  MOVEMENT_PERIOD: 10
+scenarios:
+  - name: scenario-a1
+    env:
+      TRUSTED_TIME: 0
+      T_V: 30
+      SIM_TIME: 600
+      DOWN_TIME: 120
+      NUM_VEHICLES: 20
+      NUM_ATTACKERS: 30
+      REPORT_PERIOD: 5
+  - name: scenario-a2
+    env:
+      TRUSTED_TIME: 0
+      T_V: 150
+      SIM_TIME: 1200
+      DOWN_TIME: 480
+      NUM_VEHICLES: 10
+      NUM_ATTACKERS: 40
+      REPORT_PERIOD: 10
+  - name: scenario-b1
+    env:
+      TRUSTED_TIME: 1
+      T_V: 30
+      SIM_TIME: 600
+      DOWN_TIME: 120
+      NUM_VEHICLES: 20
+      NUM_ATTACKERS: 30
+      REPORT_PERIOD: 5
+  - name: scenario-b2
+    env:
+      TRUSTED_TIME: 1
+      T_V: 150
+      SIM_TIME: 1200
+      DOWN_TIME: 480
+      NUM_VEHICLES: 10
+      NUM_ATTACKERS: 40
+      REPORT_PERIOD: 10
+runs:
+  - name: 1-honest
+    env:
+      ATTACKER_LEVEL: honest
+      TC_STORE_LAST_PRL: 0
+  - name: 2-smart
+    env:
+      ATTACKER_LEVEL: smarter
+      TC_STORE_LAST_PRL: 0
+  - name: 3-blind
+    env:
+      ATTACKER_LEVEL: blind
+      TC_STORE_LAST_PRL: 0
+  - name: 4-smart-prl
+    env:
+      ATTACKER_LEVEL: smart
+      TC_STORE_LAST_PRL: 1

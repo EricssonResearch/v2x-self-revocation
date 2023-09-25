@@ -69,11 +69,10 @@ minutes.
 # run container to verify the main design (discussed in Sections V, VI and Appendix B)
 make prove MODEL=centralized-time
 
-# Check if container is still running
-watch docker ps -a --filter name=tamarin
+# *grab a coffee* -- make sure you do not close the current shell!
 
-# When the container exits it means that Tamarin has completed. Let's check results
-docker logs -n 50 tamarin
+# After a few minutes, Tamarin completes and exits. Check output to verify
+# if all lemmas have been verified correctly
 
 # Delete container
 docker rm tamarin
@@ -86,6 +85,29 @@ To verify the alternative design discussed in Section V-B and Appendix B, simply
 replace `MODEL=centralized-time` with `MODEL=distributed-time` in the `make
 prove` above. Make sure that the previous container has completed before running
 the new one.
+
+### (Optional) Run in the background
+
+When Tamarin takes a long time to verify, you can run the container in the
+background (in "detached" mode) such that is not attached to the current shell.
+This is useful when, e.g., you are connected to a remote server with SSH and you
+can't (or don't want to) keep the shell open the whole time.
+
+```bash
+# run container to verify the main design in the background
+make prove MODEL=centralized-time BACKGROUND=1
+
+# *grab a coffee* -- you can safely close the current shell here
+
+# Check if container is still running
+watch docker ps -a --filter name=tamarin
+
+# When the container exits it means that Tamarin has completed. Let's check results
+docker logs -n 50 tamarin
+
+# Delete container
+docker rm tamarin
+```
 
 ### (Optional) Interactive mode
 

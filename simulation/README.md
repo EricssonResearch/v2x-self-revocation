@@ -37,46 +37,20 @@ See Section VII-A of our paper for more information.
 
 We require a Linux-based operating system running a recent Linux distribution.
 We tested our code on Ubuntu 22.04, but other recent distros should work as
-well. Python>=3.6 needs to be installed on the machine.
+well.
 
-1. Install Python dependencies: `pip3 install -r scripts/requirements` 
-    - We recommend using a [virtual environment](https://docs.python.org/3/library/venv.html)
+1. Install [Docker](https://docs.docker.com/engine/install/)
 2. Install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
 3. Install `screen` (needed to run simulations in background): `sudo apt install screen`
+
+Check the [Getting Started](../README.md#getting-started) guide for more
+information.
 
 ## Kubernetes cluster setup
 
 Here you can choose to run the application on an existing Kubernetes cluster or
 to setup a local cluster, e.g., using
 [Minikube](https://minikube.sigs.k8s.io/docs/).
-
-### Existing cluster
-
-If you have an existing cluster already running, make sure it is reachable via
-`kubectl`.
-
-All our Deployment specifications have a `nodeSelector` that ensures that pods
-are only deployed on nodes with the `workerNode: "yes"` label. Therefore, make
-sure to either (1) set a label to each node you want to use for the application
-using the `kubectl label nodes` command, or (2) remove the node selector from
-the specifications in `res`.
-
-**NOTE 1:** Our application uses multicast for communication between
-vehicles. However, not all Kubernetes network plugin support this feature. In
-order to run our application correctly, make sure your network plugin supports
-multicast. As far as we know,
-[Calico](https://docs.tigera.io/calico/3.25/reference/faq#can-calico-do-ip-multicast)
-*does not* support multicast, but [Weave
-net](https://www.weave.works/docs/net/latest/install/) does.
-
-**NOTE 2:** To compute average revocation times shown in our paper, each
-component logs to a file each action performed (with a timestamp). These files
-are automatically collected by our scripts after the simulation ends. Our
-scripts assume that all K8s nodes and the host share a volume, where logs will
-be stored. This volume can be specified by setting the `LOG_DIR_MOUNT` and
-`LOG_DIR_LOCAL` variables in the Makefile. If, however, there is no such shared
-volume, logs must be collected separately for each pod and put under
-`LOG_DIR_LOCAL` before calling `log_aggregator.py`.
 
 ### Minikube
 
@@ -104,33 +78,55 @@ go below 4 CPUs and 4 GB of memory.
 When you are done with all the simulations, you can run `make clean_minikube` to
 delete the instance and remove the logs directory.
 
+### Existing cluster
+
+If you want to use an existing cluster (already running and configured),
+instead, make sure it is reachable via `kubectl`.
+
+All our Deployment specifications have a `nodeSelector` that ensures that pods
+are only deployed on nodes with the `workerNode: "yes"` label. Therefore, make
+sure to either (1) set a label to each node you want to use for the application
+using the `kubectl label nodes` command, or (2) remove the node selector from
+the specifications in `res`.
+
+**NOTE 1:** Our application uses multicast for communication between
+vehicles. However, not all Kubernetes network plugin support this feature. In
+order to run our application correctly, make sure your network plugin supports
+multicast. As far as we know,
+[Calico](https://docs.tigera.io/calico/3.25/reference/faq#can-calico-do-ip-multicast)
+*does not* support multicast, but [Weave
+net](https://www.weave.works/docs/net/latest/install/) does.
+
+**NOTE 2:** To compute average revocation times shown in our paper, each
+component logs to a file each action performed (with a timestamp). These files
+are automatically collected by our scripts after the simulation ends. Our
+scripts assume that all K8s nodes and the host share a volume, where logs will
+be stored. This volume can be specified by setting the `LOG_DIR_MOUNT` and
+`LOG_DIR_LOCAL` variables in the Makefile. If, however, there is no such shared
+volume, logs must be collected separately for each pod and put under
+`LOG_DIR_LOCAL` before calling `log_aggregator.py`.
+
 ## (Optional) Build application from source
 
 **NOTE:** This step is not necessary to run the evaluation. Pre-built images are
 available on [Docker Hub](https://hub.docker.com/u/selfrevocation).
 
-The application can be built and ran locally using [Docker
+The application can be built with a single command using [Docker
 Compose](https://docs.docker.com/compose/install/linux/#install-using-the-repository):
 
 ```bash
 # Build application from source
 make build
-
-# Run application locally with Docker compose
-make run_docker
 ```
 
-Check [docker-compose.yml](./docker-compose.yml) and the [.env](./.env) file for
-more details.
-
-**NOTE 1:** With Docker Compose, the application might not be able to run
-correctly due to multicast not being properly supported. We recommend running
-with docker only to verify that all containers start correctly. 
-
-**NOTE 2:** to run your freshly built images on Kubernetes (see below), you need
+**NOTE 1:** to run your freshly built images on Kubernetes (see below), you need
 to either (1) build the images on _each_ node, or (2)  push them to a container
 registry, e.g., Docker Hub. You will also need to update the resource files
 under `res/` accordingly, to point to your images.
+
+**NOTE 2:** We recommend *not* running the application with Docker Compose,
+as containers might not be able to communicate due to multicast not being
+properly supported. Yet, this might be useful for debugging purposes.
 
 ### Minikube
 
@@ -286,41 +282,83 @@ attacker levels.
 
 ### Configure simulations
 
-We provide scripts to completely automate the simulations. The
-[simulation.yaml](./simulation.yaml) can be used to describe the simulations to
-run, and can be customized according to one's needs. The `scenarios` list sets
-up the correct parameters for each scenario, while the `runs` list describes the
-simulations to run, associating them to each scenario.
+We provide scripts to completely automate the simulations. The desired setup can
+be specified on a YAML file that is passed as input to the `run_simulations` and
+`run_simulations_background` commands. Under the [conf/](./conf) folder we
+provide three pre-configured YAML files: one used for riproducing the paper's
+results (`paper.yaml`), one for the CI pipeline (`ci.yaml`), and one for the
+artifact evaluation process (`ae.yaml`).
 
-The file is already configured with the correct parameters for each
-run/scenario. However, you can customize the number of vehicles and groups in
-each scenario according to your preference and (especially) your hardware.
+YAML configuration files can be used to describe the simulations to run, and can
+be customized according to one's needs. The `scenarios` list sets up the correct
+parameters for each scenario, while the `runs` list describes the simulations to
+run, associating them to each scenario. 
 
-In our setup, we ran 400 vehicles over 8 nodes, which is infeasible if running
-the cluster locally on one single node, e.g., with Minikube. However, the
-simulation can be scaled down according to your available resources, while still
-getting meaningful results.
+Environment variables can be specified in three levels: `env`, `scenario.env`
+and `run.env`, with increasing priority. For example, specifying the
+`NUM_VEHICLES` variable in `run.env` overwrites the `NUM_VEHICLES` variable in
+`scenario.env` (if specified), which overrides the `NUM_VEHICLES` variable in
+`env`, which overrides the `NUM_VEHICLES` variable in the [.env](.env) file.
 
-The "single" components of our application (e.g., `issuer`, `ra`, etc.) in total
-use `825` millicores and `288` MiB of memory, while each vehicle (honest or not)
-requires `75` millicores and `96` MiB of memory. For a commodity desktop machine
-with a x86-64 CPU with 8 cores and 16 GB of RAM, it would be _theoretically_
-possible to run ~98 vehicles, but we highly recommend staying between 20-50
-vehicles in total (i.e., `NUM_VEHICLES` + `NUM_ATTACKERS`).
+### Scaled-down setups
+
+Unfortunately, it is infeasible to reproduce _exactly_ the same experiments as
+we described in our paper on a commodity desktop machine and within one day. In
+fact, our setup consisted of a Kubernetes cluster running over 8 worker nodes,
+where each simulation ran for around two hours and spawned 400 vehicles. Each of
+the 4 scenarios requires 4 different simulations (each using a different
+attacker level), thus requiring a compute-time of around 32 hours.
+
+Instead, we propose a scaled-down setup that can run on a single machine. This
+should still produce results that are _similar_ to the ones showed in the paper,
+although the data gathered for each simulation would be less. In the proposed
+setup, the total simulation time will be around 4 hours, plus around 30 minutes
+for the time spent to set up/shut down each run. Don't worry: our scripts can
+completely automate the simulations and do not require any manual intervention
+after the starting command is sent.
+
+The differences compared to our setup are described in the table below:
+
+| Parameter              | Paper    | Proposed setup                                    | Notes  |
+|------------------------|----------|---------------------------------------------------|--------|
+| `SIM_TIME`             | 7200     | 600 for scenarios A1 and B1, 1200 for A2 and B2   | As scenarios A2 and B2 have a higher value for `T_eff`, we need a higher simulation time to gather sufficient data without generating bias |
+| `DOWN_TIME`            | 600      | 120 for scenarios A1 and B1, 480 for A2 and B2    | To prevent biased results, down time should be higher than `T_eff` |
+| `NUM_VEHICLES`         | 360      | 20 for scenarios A1 and B1, 10 for A2 and B2      | We do not need many honest vehicles to collect data about revocations  |
+| `NUM_ATTACKERS`        | 40       | 30 for scenarios A1 and B1, 40 for A2 and B2      | To collect enough revocations in a short time, we need a high share of attackers in the network |
+| `NUM_GROUPS`           | 20       | 3                                                 | We want to have between 15-20 vehicles per group on average |
+| `JOIN_MAX_DELAY`       | 20       | 5                                                 | Adapted due to shorter simulation times |
+| `NUM_PSEUDONYMS`       | 2        | 1                                                 | Adapted to prevent biased results, due to higher reporting frequency that might cause revoking the same vehicle multiple times |
+| `MOVEMENT_PERIOD`      | 30       | 10                                                | Adapted due to shorter simulation times |
+| `REPORT_PERIOD`        | 10       | 5 for scenarios A1 and B1, 10 for A2 and B2       | To gather sufficient data for scenarios A1 and B1 (which have a shorter simulation time), we revoke more frequently |
+
+The parameters above allow running scaled-down simulations while retaining
+similar conditions to our setup. However, since the simulation times are much
+smaller, the gathered data will be between 60-80 revocations, around 10x less
+than the ~600 of our simulations. 
+
+Feel free to adjust the parameters above based on your actual hardware
+resources. When choosing the number of vehicles, be aware that the "single"
+components of our application (e.g., `issuer`, `ra`, etc.) in total use `825`
+millicores and `288` MiB of memory, while each vehicle (honest or not) requires
+`75` millicores and `96` MiB of memory. For a commodity desktop machine with a
+x86-64 CPU with 8 cores and 16 GB of RAM, it would be _theoretically_ possible
+to run ~98 vehicles, but we highly recommend staying between 20-50 vehicles on
+each node on average.
 
 ### Run simulations
 
 Below, we describe the commands to run one or more simulations. Make sure your
-cluster is up and running, and the `simulation.yaml` file is configured
-correctly.
+cluster is up and running, and you customize your desired simulations in a YAML
+file (either by modifying the existing ones under `conf/`, or by creating a new
+file).
 
 Simulations can be executed via the `make run_simulations` command, which runs a
 script in foreground that manages each simulation automatically. Alternatively,
 the `make run_simulations_background` command runs the script in the background
-using the `screen` tool. Simulation times can be defined by passing as input to
-the targets `SIM_TIME`, expressed in seconds. Additionally, `DOWN_TIME`
-specifies the time needed to shut down the application, and is used to prevent
-bias when gathering the data.
+using the `screen` tool. The latter is _highly_ recommended, especially if you
+are connected to a remote server via SSH: since the script to manage simulations
+will run in the background, you will not have to keep your shell (or SSH
+connection) open the whole time.
 
 The more each simulation runs, the more data is gathered. Although we ran each
 simulation for around 2 hours, this is not necessary for reproducing our
@@ -331,19 +369,16 @@ To run only simulations from a specific scenario, you can set the `SCENARIO`
 variable in the `make run_simulations` command. This is useful if, for example,
 you want to reproduce only the results of the main paper (i.e.,
 `SCENARIO=scenario-a1`). Additionally, setting `RUN` will restrict the
-simulations to a specific run.
-
-When running simulations, we recommend using `run_simulations_background` such
-that you do not have to keep your shell (or SSH connection) open the whole time.
-The script will continue to run on a separate `screen` session until the end.
+simulations to a specific run. It is also possible to override the values of
+`SIM_TIME` and `DOWN_TIME` by setting them when executing the `make` command.
 
 ```bash
 # Clean up resources from earlier runs, just to be sure
 make clean
 
-# Test - run only the first simulation for 2 minutes to ensure everything works
-# Wait until the end -- after a couple of minutes, the scripts should
-make run_simulations SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
+# Example: run the simulation `1-honest` of scenario `scenario-a1` defined
+#          in the `conf/ae.yaml` file, for two minutes and 30 seconds of down time
+make run_simulations CONF=conf/ae.yaml SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
 ```
 
 ### Plotting results
@@ -354,12 +389,10 @@ plotting results.
 
 ```bash
 # Plot results of scenario 1
-# NOTE: the `PLOTS` variable specifies the attacker levels that will appear in the plot
-#       This assumes that a simulation for each attacker level has been run
+# NOTE: the `PLOTS` variable specifies what will appear in the plot, i.e., the
+#       `runs` for a particular scenario defined in the YAML configuration file.
+#       This assumes that simulations for each run have been previously computed
 make plot SCENARIO=scenario-a1 PLOTS=honest,smart,blind,smart-prl
-
-# Plot all results (assuming that all simulations for all scenarios have been run correctly)
-make plot_all
 ```
 
 _A note on results:_ It is rather unlikely that you will reproduce _exactly_ the
@@ -386,28 +419,40 @@ Note: booleans must be represented with either `0` (false) or `1` (true)
 
 ### General parameters
 
-| Parameter                    | Type       | Description                                                        |
-|------------------------------|------------|--------------------------------------------------------------------|
-| `VERSION`                   | string      | App version (latest: `v1.0.2`)                                     |
-| `LOG_LEVEL`                 | string      | Log level of the application                                       |
-| `LOG_TO_FILE`               | boolean     | write logs to a file under `/logs`                                 |
-| `LOG_TO_UDP`                | boolean     | broadcasts functional logs to UDP. Needed by the `web` component   |
-| `LOG_MAX_SIZE`              | int         | optionally indicates a maximum size of each log file, in MB        |
+| Parameter                    | Type        | Description                                                        |
+|------------------------------|-------------|--------------------------------------------------------------------|
+| `VERSION`                    | string      | App version (latest: `v1.0.2`)                                     |
+| `LOG_LEVEL`                  | string      | Log level of the application                                       |
+| `LOG_TO_FILE`                | boolean     | write logs to a file under `/logs`                                 |
+| `LOG_TO_UDP`                 | boolean     | broadcasts functional logs to UDP. Needed by the `web` component   |
+| `LOG_MAX_SIZE`               | int         | optionally indicates a maximum size of each log file, in MB        |
+
+### Simulation parameters
+
+| Parameter                    | Type        | Description                                                        |
+|------------------------------|-------------|--------------------------------------------------------------------|
+| `SIM_TIME`                   | int         | Simulation time for each run, in seconds                           |
+| `DOWN_TIME`                  | int         | Down time of a simulation, in seconds                              |
+
+`DOWN_TIME` accounts for the time needed to shut down the simulation. To avoid
+taking into account "partial" revocations (i.e., vehicles revoked shortly before
+the simulation ends), which would create biased results, it is recommnded to set
+`DOWN_TIME` higher than `T_eff`.
 
 ### System parameters
 
-| Parameter                    | Type       | Description                                                        |
-|------------------------------|------------|--------------------------------------------------------------------|
-| `T_V`                        | int        | Validity window for heartbeats and V2V messages (See Sect. V)      |
+| Parameter                    | Type        | Description                                                        |
+|------------------------------|-------------|--------------------------------------------------------------------|
+| `T_V`                        | int         | Validity window for heartbeats and V2V messages (See Sect. V)      |
 
 ### Vehicles, attackers and groups
 
-| Parameter                    | Type       | Description                                                        |
-|------------------------------|------------|--------------------------------------------------------------------|
-| `NUM_VEHICLES`              | int         | Number of honest vehicles that will be spawned                     |
-| `NUM_ATTACKERS`             | int         | Number of malicious vehicles that will be spawned                  |
-| `ATTACKER_LEVEL`            | string      | attacker level for malicious vehicles (see Sect. VII-A)            |
-| `NUM_GROUPS`                | int         | Number of groups within an area to simulate proximity (Sect VII-A) |
+| Parameter                    | Type        | Description                                                        |
+|------------------------------|-------------|--------------------------------------------------------------------|
+| `NUM_VEHICLES`               | int         | Number of honest vehicles that will be spawned                     |
+| `NUM_ATTACKERS`              | int         | Number of malicious vehicles that will be spawned                  |
+| `ATTACKER_LEVEL`             | string      | attacker level for malicious vehicles (see Sect. VII-A)            |
+| `NUM_GROUPS`                 | int         | Number of groups within an area to simulate proximity (Sect VII-A) |
 
 The attacker level defines how the OBU process heartbeats received from network,
 and different levels simulate different classes of attackers. See Sect. VII-A
@@ -417,10 +462,10 @@ for more information.
 
 | Parameter                    | Type       | Description                                                        |
 |------------------------------|------------|--------------------------------------------------------------------|
-| `NUM_PSEUDONYMS`            | int         | Max. number of concurrent pseudonyms that a vehicle can have       |
-| `PSEUDONYM_SIZE`            | int         | size of a pseudonym identifier, in bytes                           |
-| `PSEUDONYM_REFRESH_PERIOD`  | float       | Period of pseudonym rotation requested by the OBU, in seconds      |
-| `MIN_PSEUDONYM_LIFETIME`    | int         | Min. lifetime of a pseudonym (enforced by the TC), in seconds      |
+| `NUM_PSEUDONYMS`             | int        | Max. number of concurrent pseudonyms that a vehicle can have       |
+| `PSEUDONYM_SIZE`             | int        | size of a pseudonym identifier, in bytes                           |
+| `PSEUDONYM_REFRESH_PERIOD`   | float      | Period of pseudonym rotation requested by the OBU, in seconds      |
+| `MIN_PSEUDONYM_LIFETIME`     | int        | Min. lifetime of a pseudonym (enforced by the TC), in seconds      |
 
 While `PSEUDONYM_REFRESH_PERIOD` is used by the OBU to request pseudonym
 rotation to the TC, the latter can deny this request if the pseudonym to rotate

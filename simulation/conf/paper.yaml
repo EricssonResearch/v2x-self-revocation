@@ -1,0 +1,40 @@
+env:
+  SIM_TIME: 7200
+  DOWN_TIME: 600
+  NUM_VEHICLES: 360
+  NUM_ATTACKERS: 40
+  NUM_GROUPS: 20
+scenarios:
+  - name: scenario-a1
+    env:
+      TRUSTED_TIME: 0
+      T_V: 30
+  - name: scenario-a2
+    env:
+      TRUSTED_TIME: 0
+      T_V: 150
+  - name: scenario-b1
+    env:
+      TRUSTED_TIME: 1
+      T_V: 30
+  - name: scenario-b2
+    env:
+      TRUSTED_TIME: 1
+      T_V: 150
+runs:
+  - name: 1-honest
+    env:
+      ATTACKER_LEVEL: honest
+      TC_STORE_LAST_PRL: 0
+  - name: 2-smart
+    env:
+      ATTACKER_LEVEL: smarter
+      TC_STORE_LAST_PRL: 0
+  - name: 3-blind
+    env:
+      ATTACKER_LEVEL: blind
+      TC_STORE_LAST_PRL: 0
+  - name: 4-smart-prl
+    env:
+      ATTACKER_LEVEL: smart
+      TC_STORE_LAST_PRL: 1

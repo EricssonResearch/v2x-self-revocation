@@ -5,6 +5,14 @@ from jproperties import Properties
 
 env = Properties()
 
+def copy_env(from_env):
+    to_env = Properties()
+
+    for var in from_env:
+        to_env[var] = from_env[var]
+
+    return to_env
+
 def dump_properties(properties, filename):
     with open(filename, "wb") as f:
         properties.store(f, encoding="utf-8")
@@ -19,14 +27,17 @@ def find_scenario(scenarios, name):
 
 
 def parse_scenario(run, scenario, env):
+    # make a copy so that we don't overwrite vars for other runs/scenarios
+    env = copy_env(env)
+
     run_name = f"{scenario['name']}_{run['name']}.properties"
 
-    # copy scenario env
+    # copy scenario-specific environment variables
     for var in scenario["env"]:
         env[var] = str(scenario["env"][var])
         #print(var)
 
-    # copy run env
+    # copy run-specific environment variables
     for var in run["env"]:
         env[var] = str(run["env"][var])
 
@@ -47,20 +58,16 @@ sim_dir = args.sim_dir
 requested_scenario = args.scenario
 requested_run = args.run
 
-print(requested_scenario)
-
 with open(join(sim_dir, "simulation.yaml"), "r") as f:
     conf = yaml.safe_load(f)
 
 with open(env_file, "rb") as f:
     env.load(f)
 
-for scenario in conf["scenarios"]:
-    # copy env
-    for var in scenario["env"]:
-        env[var] = str(scenario["env"][var])
-        #print(var)
-
+# copy top-level environment variables
+if "env" in conf:
+    for var in conf["env"]:
+        env[var] = str(conf["env"][var])
 
 for run in conf["runs"]:
     if requested_run is not None and requested_run != run["name"]:

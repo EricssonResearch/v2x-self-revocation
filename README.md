@@ -56,11 +56,11 @@ artifacts generated as output.
 
 ### Overview
 
-* Getting started (~10-30 human-minutes, ~15 compute-minutes)
-* Kick-the-tires stage (~8-10 human-minutes, ~14-16 compute-minutes)
-* Run Tamarin proofs
-* Run simulations
-* Run Markov model
+* [Getting started](#getting-started) (~10-30 human-minutes, ~15 compute-minutes)
+* [Kick-the-tires stage](#kick-the-tires-stage) (~8-10 human-minutes, ~14-16 compute-minutes)
+* [Tamarin models](#tamarin-models) (~2 human-minutes, ~10 compute-minutes)
+* [Simulations](#simulations) (~10-20 human-minutes, ~5 compute-hours)
+* [PRL evaluation](#prl-evaluation)
 
 ### Getting started
 
@@ -110,28 +110,7 @@ Note, we assume you are using a _fresh_ environment (e.g., no containers or
 Minikube clusters are running) and you already followed the [Getting
 started](#getting-started) instructions.
 
-**Step 1: PRL (~1-2 human-minutes, ~3-5 compute-minutes)**
-
-```bash
-# go to the `prl` folder
-cd prl
-
-# 1A: test setup (~1-5 seconds)
-#     Expected output: markov matrix and the "Done" message, two cached files under `./cached`
-make test
-
-# 1B: single distribution (~3-5 minutes)
-#     Expected output: markov matrix and "Done" message, two cached files under `./cached`
-make single
-
-# 1C: clean up (~1-5 seconds)
-make clean
-
-# go back to the root folder
-cd ..
-```
-
-**STEP 2: Proofs (~2-3 human-minutes, ~1 compute-minutes)**
+**STEP 1: Tamarin models (~2-3 human-minutes, ~1 compute-minutes)**
 
 ```bash
 # go to the `proofs` folder
@@ -158,7 +137,7 @@ make clean
 cd ..
 ```
 
-**STEP 3: Simulation (~5 human-minutes, ~10 compute-minutes)**
+**STEP 2: Simulations (~5 human-minutes, ~10 compute-minutes)**
 
 Note: for step 3C, please follow the [Test instructions](./simulation/README.md#test).
 
@@ -183,15 +162,146 @@ make build_minikube
 # 3C: run and interact with the application (~5 minutes)
 #     Please follow closely the "Test" section in "simulation/README.md" (see above)
 
-# 3D: Shut down application and delete minikube instance (~2 minutes)
+# 3D: Shut down application, delete minikube instance and remove files (~2 minutes)
 make clean_all
 
 # go back to the root folder
 cd ..
 ```
 
-### Tamarin proofs
+**Step 3: PRL evaluation (~1-2 human-minutes, ~3-5 compute-minutes)**
 
-| Artifact     | Paper reference     | Description                            |
+```bash
+# go to the `prl` folder
+cd prl
+
+# 1A: test setup (~1-5 seconds)
+#     Expected output: markov matrix and the "Done" message, two cached files under `./cached`
+make test
+
+# 1B: single distribution (~3-5 minutes)
+#     Expected output: markov matrix and "Done" message, two cached files under `./cached`
+make single
+
+# 1C: clean up (~1-5 seconds)
+make clean
+
+# go back to the root folder
+cd ..
+```
+
+### Tamarin models
+
+| Artifact     | Paper references    | Description                            |
 |--------------|---------------------|----------------------------------------|
-|              |                     |                                        |
+| `centralized-time` Tamarin model | Sect. VI, Appendix B, Figs. 3,4,9, Table I | Model and proofs that verify the properties defined in Sect. V-A, for the main design of Sect. V |
+| `distributed-time` Tamarin model | Appendix B, Fig. 10, Table II | Variant of the model that assumes a trusted time source in TCs, as discussed in Sect. V-B, and proofs |
+
+The steps for reproducing our results are the same as done in kick-the-tires
+stage, but this time we will ask Tamarin to verify _all_ lemmas.
+
+Each of the models should take around 5 compute-minutes to complete.
+
+```bash
+# go to the `proofs` folder
+cd proofs
+
+# Step 1: prove all lemmas of `centralized-time` model (~5 minutes)
+#     Expected output: 
+#     - Tamarin computations and "summary of summaries" at the end
+#     - In the summary, all lemmas are marked as "verified"
+#     - a `output_centralized.spthy` file under `./out`
+make prove MODEL=centralized-time OUT_FILE=output_centralized.spthy
+
+# Step 2: prove all lemmas of `distributed-time` model (~5 minutes)
+#     Expected output: 
+#     - Tamarin computations and "summary of summaries" at the end
+#     - In the summary, all lemmas are marked as "verified"
+#     - a `output_distributed.spthy` file under `./out`
+make prove MODEL=distributed-time OUT_FILE=output_distributed.spthy
+
+# Step 3: clean up (~1-5 seconds)
+make clean
+
+# go back to the root folder
+cd ..
+```
+
+### Simulations
+
+| Artifact        | Paper references        | Description                            |
+|-----------------|-------------------------|----------------------------------------|
+| `scenario-a1`   | Sect. VII-A, Fig. 5,11  | Box plots showing distributions of revocation times under different attacker classes, for T_v = 30 seconds and no trusted time in TCs |
+| `scenario-a2`   | Appendix C, Fig. 12     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 150 seconds and no trusted time in TCs |
+| `scenario-b1`   | Appendix C, Fig. 13     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 30 seconds and assuming a trusted time in TCs |
+| `scenario-b2`   | Appendix C, Fig. 14     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 150 seconds and assuming a trusted time in TCs |
+
+In order to run the simulations locally and within a few hours, we provide a
+scaled-down configuration that spawns 50 vehicles and runs all simulations in
+around **4.5 to 5 hours**. This configuration is described in the `conf/ae.yaml`
+file. For a more detailed description of this setup, [click
+here](./simulation/README.md#scaled-down-setups).
+
+Note: we recommend running the simulations when nothing else is running on the
+same machine.
+
+```bash
+# go to the `simulation` folder
+cd simulation
+
+# Step 1: create a new Minikube instance and build application (~3-8 minutes)
+#     Note: These are the same steps as done in the kick-the-tires stage
+#           If you still have a Minikube cluster running, you can skip this step
+#     Expected output:
+#     - Same as the `kick-the-tires` stage (no errors, `logs/` created)
+make run_minikube
+make build_minikube
+
+# Step 2: Test - run the first run of the first scenario for five minutes (~5 minutes)
+#     This step is only to make sure our setup works
+#     Expected output:
+#     - a `simulation` folder created
+#     - (after ~1 minute since start) the log file `simulations/out.log` does not show errors and is "SLEEPING"
+#     - (after ~2-3 minutes since start) `kubectl -n v2x get pods` shows all pods in "Running" state
+#     - (after ~5-6 minutes since start) `kubectl -n v2x get pods` shows pods in "Terminating" state or no pods at all
+#     - (after ~6-7 minutes since start) the log file `simulations/out.log` shows "ALL DONE" as last message
+#     - (after ~6-7 minutes since start) the `simulations/results` folder contains `scenario-a1_1-honest.json`
+make run_simulations_background CONF=conf/ae.yaml SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=300 DOWN_TIME=30
+
+# Step 3: Run all simulations (~4.5-5 hours)
+#     Note: you can run the command, grab a coffee and come back in 5 hours
+#     Expected output:
+#     - a `simulations` folder created. `simulations/scenarios` contain one `.properties` file for each run (total: 16 files)
+#     - (after ~1 minute since start) the log file `simulations/out.log` does not show errors and is "SLEEPING"
+#     - (after ~2 minutes since start) `kubectl -n v2x get pods` shows all pods in "Running" state
+#     - (after ~4.5 hours since start) `kubectl -n v2x get pods` shows pods in "Terminating" state or no pods at all
+#     - (after ~4.5 hours since start) the log file `simulations/out.log` shows "ALL DONE" as last message
+#     - (after ~4.5 hours since start) the `simulations/results` folder contains one JSON file for each run (total: 16 files)
+make run_simulations_background CONF=conf/ae.yaml
+
+# Step 4: Plot results (~2 minutes)
+#     Expected output:
+#     - `data`, `figs` and `tikz` folders created under `simulations`
+#     - `data` contains 8 files (2 for each scenario), `figs` and `tikz` one file for each scenario
+#     - 
+make plot_all
+
+# Step 5 (optional): Copy results somewhere safe (`simulations` folder will be deleted in the next step!)
+
+# Step 6: Shut down application, delete minikube instance and remove files (~2 minutes)
+make clean_all
+
+# go back to the root folder
+cd ..
+```
+
+### PRL evaluation
+
+| Artifact              | Paper references    | Description                            |
+|-----------------------|---------------------|----------------------------------------|
+| `p-plot`              | Sect. VII-B, Fig. 6 | Plots percentiles for maximum PRL sizes under different scenarios and shares of attackers, with fixed T_prl and number of pseudonyms |
+| `n-plot`              | Appendix D, Fig. 16 | Plots 99th percentile for maximum PRL sizes under different number of pseudonyms, in four different scenarios |
+| `t-plot`              | Appendix D, Fig. 17 | Plots 99th percentile for maximum PRL sizes under different values for T_prl, in four different scenarios |
+| `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates T_eff, heartbeat frequency, heartbeat size, and required bandwidth under different values for T_v |
+
+
