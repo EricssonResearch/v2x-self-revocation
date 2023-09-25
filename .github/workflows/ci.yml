@@ -21,15 +21,6 @@ jobs:
         make clean
       timeout-minutes: 5
     -
-      name: PRL
-      run: |
-        cd prl
-        make test
-        make single
-        make clean
-
-      timeout-minutes: 5
-    -
       name: Simulation
       run: |
         cd simulation
@@ -38,3 +29,12 @@ jobs:
         make run_simulations CONF=conf/ci.yaml SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
         make clean_all
       timeout-minutes: 10
+    -
+      name: PRL
+      run: |
+        cd prl
+        make test
+        make single
+        make clean
+
+      timeout-minutes: 5

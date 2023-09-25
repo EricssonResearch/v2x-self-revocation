@@ -26,7 +26,6 @@ single: init_dirs
 tikz: init_dirs
 	@echo "Generating transition graph (Fig. 15)."
 	$(DOCKER_CMD) python3 main.py -n 3 -p 0.1 -e 2 -f $(PLOT_DIR)/tikz-graph.tex
-	cat $(PLOT_DIR)/tikz-graph.tex
 
 p-plot: init_dirs
 	$(DOCKER_CMD) ./scripts/p-plot.sh --cache-dir $(CACHE_DIR) --path $(PLOT_DIR)

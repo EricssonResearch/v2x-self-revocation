@@ -207,7 +207,7 @@ cd ..
 The steps for reproducing our results are the same as done in kick-the-tires
 stage, but this time we will ask Tamarin to verify _all_ lemmas.
 
-In total, this evaluation should take around **10 minutes**.
+In total, this evaluation should take around **10 compute-minutes**.
 
 ```bash
 # go to the `proofs` folder
@@ -245,10 +245,10 @@ cd ..
 
 In order to run the simulations locally and within a few hours, we provide a
 scaled-down configuration that spawns 50 vehicles and runs all simulations in
-around **4.5 to 5 hours**. This configuration is described in the `conf/ae.yaml`
-file, and should provide _similar_ results compared to ours, although with much
-less collected data. For a more detailed description of this setup, [click
-here](./simulation/README.md#scaled-down-setups).
+around **4.5 to 5 compute-hours**. This configuration is described in the
+`conf/ae.yaml` file, and should provide _similar_ results compared to ours,
+although with much less collected data. For a more detailed description of this
+setup, [click here](./simulation/README.md#scaled-down-setups).
 
 Note: we recommend running the simulations when nothing else is running on the
 same machine.
@@ -308,8 +308,37 @@ cd ..
 | Artifact              | Paper references    | Description                            |
 |-----------------------|---------------------|----------------------------------------|
 | `p-plot`              | Sect. VII-B, Fig. 6 | Plots percentiles for maximum PRL sizes under different scenarios and shares of attackers, with fixed T_prl and number of pseudonyms |
+| `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates T_eff, heartbeat frequency, heartbeat size, and required bandwidth under different values for T_v |
+| `tikz-graph`          | Appendix D, Fig. 15 | Simple transition graph |
 | `n-plot`              | Appendix D, Fig. 16 | Plots 99th percentile for maximum PRL sizes under different number of pseudonyms, in four different scenarios |
 | `t-plot`              | Appendix D, Fig. 17 | Plots 99th percentile for maximum PRL sizes under different values for T_prl, in four different scenarios |
-| `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates T_eff, heartbeat frequency, heartbeat size, and required bandwidth under different values for T_v |
 
+In total, this evaluation should take around **2.5 compute-hours**.
 
+```bash
+# go to the `prl` folder
+cd prl
+
+# Step 1: transition graph (~1-5 seconds)
+#     Expected output: markov matrix and the "Done" message, `tikz-graph.tex` file under `plots`
+make tikz
+
+# Step 2: Plot series over the different probabilities (~16 minutes)
+#     Expected output:
+make p-plot
+
+# Step 3: Plot series over the number of pseudonyms (~26 minutes)
+#     Expected output:
+make n-plot
+
+# Step 4: Plot series over the time each pseudonym stays in the list (~90 minutes)
+#     Expected output:
+make t-plot
+
+# Step 5: Generate distribution for Tv (~18 minutes)
+#     Expected output:
+make tv-distribution
+
+# go back to the root folder
+cd ..
+```

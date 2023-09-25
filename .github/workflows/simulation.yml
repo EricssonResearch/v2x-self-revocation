@@ -3,6 +3,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  proofs:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: Run main design (centralized-time)
+      run: |
+        cd proofs
+        make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4 OUT_FILE=output_centralized.spthy
+        docker logs -n 200 tamarin > out/log_centralized.txt
+      timeout-minutes: 10
+    -
+      name: Run alternative design (distributed-time)
+      run: |
+        cd proofs
+        make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4 OUT_FILE=output_distributed.spthy
+        docker logs -n 200 tamarin > out/log_distributed.txt
+      timeout-minutes: 10
+    - 
+      name: Upload results
+      uses: actions/upload-artifact@v3
+      with:
+        name: proofs
+        path: proofs/out
   simulation:
     runs-on: ubuntu-latest
     steps:
@@ -36,28 +61,39 @@ jobs:
       with:
         name: simulation
         path: simulation/simulations
-  proofs:
+  prl:
     runs-on: ubuntu-latest
     steps:
     -
       uses: actions/checkout@master
     -
-      name: Run main design (centralized-time)
+      name: Transition graph
       run: |
-        cd proofs
-        make prove VERSION=v1.6.1 MODEL=centralized-time THREADS=4 OUT_FILE=output_centralized.spthy
-        docker logs -n 200 tamarin > out/log_centralized.txt
-      timeout-minutes: 10
+        cd prl
+        make tikz
     -
-      name: Run alternative design (distributed-time)
+      name: p-plot
       run: |
-        cd proofs
-        make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4 OUT_FILE=output_distributed.spthy
-        docker logs -n 200 tamarin > out/log_distributed.txt
-      timeout-minutes: 10
+        cd prl
+        make p-plot
+    -
+      name: n-plot
+      run: |
+        cd prl
+        make n-plot
+    -
+      name: t-plot
+      run: |
+        cd prl
+        make t-plot
+    -
+      name: tv-distribution
+      run: |
+        cd prl
+        make tv-distribution
     - 
       name: Upload results
       uses: actions/upload-artifact@v3
       with:
-        name: proofs
-        path: proofs/out
+        name: prl-plots
+        path: prl/plots
