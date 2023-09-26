@@ -8,5 +8,5 @@ do
 python3 generate_plots.py -e $value -n 800 -p 0.000196612735153 "$@"
 done
 
-echo "Data generated. Generating distribution."
-python3 tv-distribution.py
+echo "Data generated. Generating plot."
+python3 tv-distribution.py "$@"

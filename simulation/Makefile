@@ -1,39 +1,42 @@
-LOG_DIR_MOUNT   ?= /logs
-LOG_DIR_LOCAL   ?= $(shell pwd)/logs
-CONF            ?= conf/paper.yaml
-SIM_DIR         ?= simulations
-LOG_FILE        ?= $(SIM_DIR)/out.log
-SCENARIO        ?=
-RUN             ?=
-PLOTS			?= 
-PLOT_NAME		?= $(SCENARIO)
+LOG_DIR_MOUNT           ?= /logs
+LOG_DIR_LOCAL           ?= $(shell pwd)/logs
+CONF                    ?= conf/paper.yaml
+SIM_DIR                 ?= simulations
+LOG_FILE                ?= $(SIM_DIR)/out.log
+SCENARIO                ?=
+RUN                     ?=
+PLOTS			        ?= 
+PLOT_NAME		        ?= $(SCENARIO)
 
-MINIKUBE_CPUS   ?= $(shell nproc)
-MINIKUBE_MEMORY ?= $(shell expr `free -m | grep Mem: | awk '{print $$2}'` / 2)
+MINIKUBE_CPUS           ?= $(shell nproc)
+MINIKUBE_MEMORY         ?= $(shell expr `free -m | grep Mem: | awk '{print $$2}'` / 2)
 
-DOCKER_PYTHON   ?= selfrevocation/python
+DOCKER_PYTHON           ?= selfrevocation/python
 
 # Set PYTHON to "python" to work locally
-PYTHON          ?= docker run --rm -v $(shell pwd):/usr/src/app -v $(LOG_DIR_LOCAL):$(LOG_DIR_LOCAL) $(DOCKER_PYTHON)
+PYTHON                  ?= docker run --rm -v $(shell pwd):/usr/src/app -v $(LOG_DIR_LOCAL):$(LOG_DIR_LOCAL) $(DOCKER_PYTHON)
 
-ENV_FILE        ?= .env
-DOCKER_REGISTRY ?= docker.io
-DOCKER_USERNAME ?= selfrevocation
-DOCKER_TOKEN    ?= 
+ENV_FILE                ?= .env
+DOCKER_REGISTRY         ?= docker.io
+DOCKER_USERNAME         ?= selfrevocation
+DOCKER_TOKEN            ?= 
 
-VERSION         ?= $(shell cat $(ENV_FILE) | grep VERSION | cut -d "=" -f2)
-NUM_VEHICLES    ?= $(shell cat $(ENV_FILE) | grep NUM_VEHICLES | cut -d "=" -f2)
-NUM_ATTACKERS   ?= $(shell cat $(ENV_FILE) | grep NUM_ATTACKERS | cut -d "=" -f2)
+VERSION                 ?= $(shell cat $(ENV_FILE) | grep VERSION | cut -d "=" -f2)
+NUM_VEHICLES            ?= $(shell cat $(ENV_FILE) | grep NUM_VEHICLES | cut -d "=" -f2)
+NUM_ATTACKERS           ?= $(shell cat $(ENV_FILE) | grep NUM_ATTACKERS | cut -d "=" -f2)
 
-SIM_TIME        ?= -1
-DOWN_TIME       ?= -1
+SIM_TIME                ?= -1
+DOWN_TIME               ?= -1
 
-REPLICASET_VEHICLES = $(shell kubectl describe deployment -n v2x vehicle | grep "replica set" | sed -r "s/ /\n/g" | grep "vehicle")
-REPLICASET_ATTACKERS = $(shell kubectl describe deployment -n v2x attacker | grep "replica set" | sed -r "s/ /\n/g" | grep "attacker")
+REPLICASET_VEHICLES      = $(shell kubectl describe deployment -n v2x vehicle | grep "replica set" | sed -r "s/ /\n/g" | grep "vehicle")
+REPLICASET_ATTACKERS     = $(shell kubectl describe deployment -n v2x attacker | grep "replica set" | sed -r "s/ /\n/g" | grep "attacker")
+
+PORT_FORWARD_ADDR       ?= 127.0.0.1
+
+MKDIR                   ?= mkdir -m 777 -p
 
 mkdir:
-	mkdir -p cred
-	chmod o+rw cred
+	$(MKDIR) cred
 
 gen_ra_key: mkdir
 	$(PYTHON) scripts/gen_keys.py
@@ -75,7 +78,7 @@ scale_attackers:
 	kubectl -n v2x scale --replicas $(NUM_ATTACKERS) deployment attacker
 
 port_forward:
-	kubectl -n v2x port-forward service/web 8080:80
+	kubectl -n v2x port-forward --address $(PORT_FORWARD_ADDR) service/web 8080:80
 
 check_pods:
 	kubectl describe replicaset -n v2x $(REPLICASET_VEHICLES) | grep Running
@@ -85,20 +88,19 @@ init_simulations:
 	@echo "Initializing folders.."
 	rm -rf $(LOG_DIR_LOCAL)/*
 	test -f $(CONF)
-	mkdir -p $(SIM_DIR)
-	chmod o+rw $(SIM_DIR)
+	$(MKDIR) $(SIM_DIR)
 	cp -r $(CONF) $(SIM_DIR)/simulation.yaml
 	rm -rf $(SIM_DIR)/scenarios
 	rm -rf $(SIM_DIR)/results
 	rm -rf $(SIM_DIR)/data
 	rm -rf $(SIM_DIR)/figs
-	mkdir -p $(SIM_DIR)/scenarios
-	mkdir -p $(SIM_DIR)/results
+	$(MKDIR) $(SIM_DIR)/scenarios
+	$(MKDIR) $(SIM_DIR)/results
 	@echo "Parsing simulation YAML file and environment variables.."
 	$(PYTHON) scripts/parse_simulations.py --env_file $(ENV_FILE) --sim_dir $(SIM_DIR) --scenario $(SCENARIO) --run $(RUN)
 
 run_minikube:
-	mkdir -p $(LOG_DIR_LOCAL)
+	$(MKDIR) $(LOG_DIR_LOCAL)
 	minikube start --mount --mount-string="$(LOG_DIR_LOCAL):$(LOG_DIR_MOUNT)" \
 		--cpus $(MINIKUBE_CPUS) --memory $(MINIKUBE_MEMORY) --driver=docker 
 	kubectl label nodes minikube workerNode=yes
@@ -118,15 +120,15 @@ aggregate_logs:
 	$(PYTHON) scripts/log_aggregator.py $(LOG_DIR_LOCAL) $(LOG_FILE) $(SIM_TIME) $(DOWN_TIME) $(ENV_FILE)
 
 plot:
-	mkdir -p $(SIM_DIR)/figs
-	mkdir -p $(SIM_DIR)/tikz
-	mkdir -p $(SIM_DIR)/data
+	$(MKDIR) $(SIM_DIR)/figs
+	$(MKDIR) $(SIM_DIR)/tikz
+	$(MKDIR) $(SIM_DIR)/data
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) $(SCENARIO) $(PLOTS)
 
 plot_all:
-	mkdir -p $(SIM_DIR)/figs
-	mkdir -p $(SIM_DIR)/tikz
-	mkdir -p $(SIM_DIR)/data
+	$(MKDIR) $(SIM_DIR)/figs
+	$(MKDIR) $(SIM_DIR)/tikz
+	$(MKDIR) $(SIM_DIR)/data
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-a1 honest,smart,blind,smart-prl
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-a2 honest,smart,blind,smart-prl
 	$(PYTHON) scripts/plot_data.py $(SIM_DIR) scenario-b1 honest,smart,blind,smart-prl

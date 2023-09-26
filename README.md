@@ -57,7 +57,7 @@ README files on each folder contains extensive instructions for running all the
 experiments locally.
 
 For reference, our results are also computed via our [CI
-pipeline](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/simulation.yml).
+pipeline](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/artifacts.yml).
 The latest workflow contains the same steps described in this section and the
 artifacts generated as output.
 
@@ -67,7 +67,7 @@ artifacts generated as output.
 * [Kick-the-tires stage](#kick-the-tires-stage) (~8-10 human-minutes, ~14-16 compute-minutes)
 * [Tamarin models](#tamarin-models) (~2 human-minutes, ~10 compute-minutes)
 * [Simulations](#simulations) (~20-30 human-minutes, ~5 compute-hours)
-* [PRL evaluation](#prl-evaluation)
+* [PRL evaluation](#prl-evaluation) (~10-20 human-minutes, ~2.5-3.5 compute-hours)
 
 ### Getting started
 
@@ -76,7 +76,7 @@ recent Linux operating system installed (preferably one between Ubuntu 20.04,
 Ubuntu 22.04 and Debian 12). A machine with at least 8 cores and 16 GB of RAM is
 _recommended_ to ensure that all the artifacts run correctly.
 
-Below, we require the following software components installed and configured on
+We require the following software components installed and configured on
 the machine:
 - `git`, `make`, `screen` installed via apt: `sudo apt install -y git make screen`
 - [Docker](https://docs.docker.com/engine/install/)
@@ -127,6 +127,7 @@ cd proofs
 #     Expected output: 
 #     - Tamarin computations and "summary of summaries" at the end
 #     - `all_heartbeats_processed_within_tolerance` marked as "verified"
+#     - all other lemmas marked as "analysis incomplete" (since we do not verify them in this stage)
 #     - a `output_centralized.spthy` file under `./out`
 make test MODEL=centralized-time OUT_FILE=output_centralized.spthy
 
@@ -134,6 +135,7 @@ make test MODEL=centralized-time OUT_FILE=output_centralized.spthy
 #     Expected output: 
 #     - Tamarin computations and "summary of summaries" at the end
 #     - `all_heartbeats_processed_within_tolerance` marked as "verified"
+#     - all other lemmas marked as "analysis incomplete" (since we do not verify them in this stage)
 #     - a `output_distributed.spthy` file under `./out`
 make test MODEL=distributed-time OUT_FILE=output_distributed.spthy
 
@@ -153,8 +155,10 @@ Note: for step 3C, please follow the [Test instructions](./simulation/README.md#
 cd simulation
 
 # 3A: create a new Minikube instance (~1-5 minutes)
-#     Note: by default we use all CPUs and half the memory in your machine
+#     Note 1: by default we use all CPUs and half the memory in your machine
 #     You can override this by setting the MINIKUBE_CPUS and MINIKUBE_MEMORY variables
+#     Note 2: Make sure you are *not* running your shell as `root`, otherwise
+#     Minikube will fail to start.
 #     Expected output:
 #     - A success message similar to "Done! kubectl is now configured..."
 #     - The "./logs" folder created
@@ -227,7 +231,9 @@ make prove MODEL=centralized-time OUT_FILE=output_centralized.spthy
 #     - a `output_distributed.spthy` file under `./out`
 make prove MODEL=distributed-time OUT_FILE=output_distributed.spthy
 
-# Step 3: clean up (~1-5 seconds)
+# Step 3 (optional): Copy results somewhere safe (`out` folder will be deleted in the next step!)
+
+# Step 4: clean up (~1-5 seconds)
 make clean
 
 # go back to the root folder
@@ -307,40 +313,57 @@ cd ..
 
 | Artifact              | Paper references    | Description                            |
 |-----------------------|---------------------|----------------------------------------|
-| `p-plot`              | Sect. VII-B, Fig. 6 | Plots percentiles for maximum PRL sizes under different scenarios and shares of attackers, with fixed T_prl and number of pseudonyms |
-| `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates T_eff, heartbeat frequency, heartbeat size, and required bandwidth under different values for T_v |
+| `p-plot`              | Sect. VII-B, Fig. 6 | Plots percentiles for maximum PRL sizes under different scenarios and shares of attackers, with fixed `T_prl` and number of pseudonyms |
+| `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates `T_eff`, heartbeat frequency, heartbeat size, and required bandwidth under different values for `T_v` |
 | `tikz-graph`          | Appendix D, Fig. 15 | Simple transition graph |
 | `n-plot`              | Appendix D, Fig. 16 | Plots 99th percentile for maximum PRL sizes under different number of pseudonyms, in four different scenarios |
-| `t-plot`              | Appendix D, Fig. 17 | Plots 99th percentile for maximum PRL sizes under different values for T_prl, in four different scenarios |
+| `t-plot`              | Appendix D, Fig. 17 | Plots 99th percentile for maximum PRL sizes under different values for `T_prl`, in four different scenarios |
 
-In total, this evaluation should take around **2.5 compute-hours**.
+In total, this evaluation should take between **2.5 and 3.5 compute-hours**,
+depending on your hardware.
 
 ```bash
 # go to the `prl` folder
 cd prl
 
 # Step 1: transition graph (~1-5 seconds)
-#     Expected output: markov matrix and the "Done" message, `tikz-graph.tex` file under `plots`
+#     Expected output:
+#     - markov matrix and the "Done" message printed to standard output
+#     - `tikz-graph.tex` plot under `./plots`
 make tikz
 
-# Step 2: Plot series over the different probabilities (~16 minutes)
+# Step 2: Plot series over the different probabilities (~15-20 minutes)
 #     Expected output: 
 #     - no errors printed to standard output
-#     - several distributions plotted in `./plots/distributions`
-#     - p-plot_n800_e30.tex and p-plot_n800_e30.png files under `./plots`
+#     - several distributions cached in `./cached` and plotted in `./plots/distributions`
+#     - plots `p-plot_n800_e30.{tex,png}` under `./plots`
 make p-plot
 
-# Step 3: Plot series over the number of pseudonyms (~26 minutes)
+# Step 3: Plot series over the number of pseudonyms (~25-35 minutes)
 #     Expected output:
+#     - no errors printed to standard output
+#     - several distributions cached in `./cached` and plotted in `./plots/distributions`
+#     - plots `n-plot_e30.{tex,png}` under `./plots`
 make n-plot
 
-# Step 4: Plot series over the time each pseudonym stays in the list (~90 minutes)
+# Step 4: Plot series over the time each pseudonym stays in the list (~90-140 minutes)
 #     Expected output:
+#     - no errors printed to standard output
+#     - several distributions cached in `./cached` and plotted in `./plots/distributions`
+#     - plots `t-plot_n800.{tex,png}` under `./plots`
 make t-plot
 
-# Step 5: Generate distribution for Tv (~18 minutes)
+# Step 5: Generate distribution for Tv (~15-20 minutes)
 #     Expected output:
+#     - no errors printed to standard output
+#     - several distributions cached in `./cached` and plotted in `./plots/distributions`
+#     - plots `tv-distribution.{tex,png}` under `./plots`
 make tv-distribution
+
+# Step 6 (optional): Copy results somewhere safe (`plots` folder will be deleted in the next step!)
+
+# Step 7: clean up
+make clean
 
 # go back to the root folder
 cd ..

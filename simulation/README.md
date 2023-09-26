@@ -69,7 +69,10 @@ node. _Note:_ the `LOG_DIR_LOCAL` (default `./logs`) will be mounted to the
 Minikube instance. Do *not* delete this folder until you are done with all the
 simulations, otherwise it will not be possible to collect the logs.
 
-**NOTE:** Make sure you have enough resources to run Minikube. You can specify
+**NOTE 1:** Make sure you are not running as `root`, otherwise Minikube will
+fail to start.
+
+**NOTE 2:** Make sure you have enough resources to run Minikube. You can specify
 number of CPUs and amount of memory by overriding the `MINIKUBE_CPUS` and
 `MINIKUBE_MEMORY` variables. By default, the Makefile is configured to use all
 the CPUs and half the memory in your machine. In general we recommend _not_ to
@@ -216,11 +219,18 @@ port 8080 via the `make port_forward` command (run this on a separate shell):
 
 ```bash
 # Expose the web interface locally on port 8080
-make port_forward
+# Note: you can specify `PORT_FORWARD_ADDR=0.0.0.0` to listen to all addresses
+make port_forward 
 ```
 
-Now open the browser and go to http://localhost:8080. You should be able to see
-our V2X dashoard that shows the current map, similar to the picture below. 
+Now open the browser and go to http://localhost:8080: You should be able to see
+our V2X dashoard that shows the current map, similar to the picture below.
+
+**NOTE:** if you are running `kubectl` on a remote server (e.g., via SSH), you
+need to either: (1) set up SSH port forwarding from the server to your local
+machine on port 8080, or (2) if the server has a public IP, connect to that IP
+address instead of localhost. In the latter case, you need to specify
+`PORT_FORWARD_ADDR=0.0.0.0` in the command above.
 
 ![Map](./imgs/webapp.PNG)
 
@@ -228,12 +238,18 @@ Each circle represents a _pseudonym_, and can have different colors:
 - Green: honest (i.e., belonging to a "honest" vehicle)
 - Yellow: victim (i.e., belonging to a "honest" vehicle, but under the influence
   of an attacker)
-- Red: malicious (i.e., belonging to a "attacker" vehicle) 
+- Red: malicious (i.e., belonging to a "attacker" vehicle).
 
+The `reporter` pod randomly reports a malicious pseudonym every 10 seconds, but
+although it takes longer to effectively revoke it (according to the upper bound
+`T_eff`, which in this case is 60 seconds).
+  
 Shaded rectangles show different groups, in our case only two of them are used.
+Additionally, you may see some arrows from time to time, which illustrate
+movement of pseudonyms between groups.
 
 Even if we deployed only 5 vehicles, you may see more than 5 circles in the map,
-because the map shows _pseudonyms_ ant not vehicles: In fact, in our
+because the map shows _pseudonyms_ and not vehicles: In fact, in our
 configuration each vehicle has two concurrent pseudonyms. Our map simulates a
 _passive observer_ that can only see network messages but cannot infer which
 pseudonym belongs to which vehicle.

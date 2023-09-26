@@ -7,12 +7,10 @@ DOCKER_BINDING = -v $(ROOT_DIR):/usr/src/app -t
 # Set DOCKER_CMD to the empty string to work locally
 DOCKER_CMD ?= docker run --rm $(DOCKER_BINDING) $(DOCKER_NAME)
 
-# It would be nice to use the local user for permissions but that breaks matplotlib
-#--user "$(shell id -u):$(shell id -g)"
-# To mitigate this, we now just run the make clean inside docker to have the right permissions to remove the files we created.
-
 CACHE_DIR ?= cached
 PLOT_DIR ?= plots
+
+MKDIR ?= mkdir -m 777 -p
 
 build-docker:
 	docker build . -t $(DOCKER_NAME)
@@ -58,10 +56,9 @@ all: init_dirs check p-plot t-plot n-plot tv-distribution tikz
 	@echo Successfully created all graphs!
 
 init_dirs:
-	@mkdir -p $(CACHE_DIR)
-	@chmod o+rw $(CACHE_DIR)
-	@mkdir -p $(PLOT_DIR)/distributions
-	@chmod o+rw $(PLOT_DIR)
+	@$(MKDIR) $(CACHE_DIR)
+	@$(MKDIR) $(PLOT_DIR)
+	@$(MKDIR) $(PLOT_DIR)/distributions
 
 clean:
 	rm -rf $(CACHE_DIR) $(PLOT_DIR)
