@@ -1,6 +1,4 @@
 env:
-  SIM_TIME: 600
-  DOWN_TIME: 60
   NUM_VEHICLES: 1
   NUM_ATTACKERS: 4
   NUM_GROUPS: 1
@@ -12,18 +10,26 @@ scenarios:
     env:
       TRUSTED_TIME: 0
       T_V: 30
+      SIM_TIME: 600
+      DOWN_TIME: 70
   - name: scenario-a2
     env:
       TRUSTED_TIME: 0
       T_V: 150
+      SIM_TIME: 1200
+      DOWN_TIME: 330
   - name: scenario-b1
     env:
       TRUSTED_TIME: 1
       T_V: 30
+      SIM_TIME: 600
+      DOWN_TIME: 70
   - name: scenario-b2
     env:
       TRUSTED_TIME: 1
       T_V: 150
+      SIM_TIME: 1200
+      DOWN_TIME: 330
 runs:
   - name: 1-honest
     env:

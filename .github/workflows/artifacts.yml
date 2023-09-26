@@ -22,6 +22,11 @@ jobs:
         make prove VERSION=v1.6.1 MODEL=distributed-time THREADS=4 OUT_FILE=output_distributed.spthy
         docker logs -n 200 tamarin > out/log_distributed.txt
       timeout-minutes: 10
+    -
+      name: Remove temp files
+      run: |
+        cd proofs
+        rm -rf out/theory.spthy out/oracle.py
     - 
       name: Upload results
       uses: actions/upload-artifact@v3
@@ -46,15 +51,15 @@ jobs:
         make run_simulations CONF=conf/ci.yaml SCENARIO=scenario-a1 RUN=1-honest SIM_TIME=120 DOWN_TIME=30
         make clean
     -
-      name: Run Scenario A1 (4 runs x 10 min)
+      name: Run simulations
       run: |
         cd simulation
-        make run_simulations CONF=conf/ci.yaml SCENARIO=scenario-a1
+        make run_simulations CONF=conf/ci.yaml
     -
       name: Generate plots
       run: |
         cd simulation
-        make plot SCENARIO=scenario-a1 PLOTS=honest,smart,blind,smart-prl
+        make plot_all
     - 
       name: Upload results
       uses: actions/upload-artifact@v3

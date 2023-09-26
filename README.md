@@ -290,8 +290,8 @@ make run_simulations_background CONF=conf/ae.yaml
 # Step 4: Plot results (~2 minutes)
 #     Expected output:
 #     - `data`, `figs` and `tikz` folders created under `simulations`
-#     - `data` contains 8 files (2 for each scenario), `figs` and `tikz` one file for each scenario
-#     - 
+#     - `data` contains 8 .csv files (2 for each scenario)
+#     - `figs` and `tikz` contain 4 files each, i.e., one plot for each scenario
 make plot_all
 
 # Step 5 (optional): Copy results somewhere safe (`simulations` folder will be deleted in the next step!)
@@ -324,7 +324,10 @@ cd prl
 make tikz
 
 # Step 2: Plot series over the different probabilities (~16 minutes)
-#     Expected output:
+#     Expected output: 
+#     - no errors printed to standard output
+#     - several distributions plotted in `./plots/distributions`
+#     - p-plot_n800_e30.tex and p-plot_n800_e30.png files under `./plots`
 make p-plot
 
 # Step 3: Plot series over the number of pseudonyms (~26 minutes)

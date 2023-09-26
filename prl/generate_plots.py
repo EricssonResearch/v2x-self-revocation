@@ -66,6 +66,9 @@ def main(
 
     print(f'Running main script for n=[{n},{n+n_max}], e=[{e},{e+e_max}], and p={p}')
     num_threads = (n_max) * (e_max)
+    
+    # write plots on the "distributions" folder within plot_dir
+    plot_dir = plot_dir.joinpath("distributions")
     print(f'Creating dir {str(plot_dir)}')
     plot_dir.mkdir(parents=True, exist_ok=True)
 

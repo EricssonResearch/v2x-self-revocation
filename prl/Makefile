@@ -60,7 +60,7 @@ all: init_dirs check p-plot t-plot n-plot tv-distribution tikz
 init_dirs:
 	@mkdir -p $(CACHE_DIR)
 	@chmod o+rw $(CACHE_DIR)
-	@mkdir -p $(PLOT_DIR)
+	@mkdir -p $(PLOT_DIR)/distributions
 	@chmod o+rw $(PLOT_DIR)
 
 clean:
