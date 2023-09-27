@@ -4,7 +4,7 @@ on:
 
 jobs:
   proofs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     -
       uses: actions/checkout@master
@@ -34,7 +34,7 @@ jobs:
         name: proofs
         path: proofs/out
   simulation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     -
       uses: actions/checkout@master
@@ -67,7 +67,7 @@ jobs:
         name: simulation
         path: simulation/simulations
   prl:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     -
       uses: actions/checkout@master

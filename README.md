@@ -72,34 +72,36 @@ artifacts generated as output.
 ### Getting started
 
 Our artifacts can be run on a commodity desktop machine with a x86-64 CPU an a
-recent Linux operating system installed (preferably one between Ubuntu 20.04,
-Ubuntu 22.04 and Debian 12). A machine with at least 8 cores and 16 GB of RAM is
+recent Linux operating system installed (preferably one between Ubuntu >= 20.04
+and Debian >= 10). A machine with at least 8 cores and 16 GB of RAM is
 _recommended_ to ensure that all the artifacts run correctly.
 
-We require the following software components installed and configured on
-the machine:
-- `git`, `make`, `screen` installed via apt: `sudo apt install -y git make screen`
-- [Docker](https://docs.docker.com/engine/install/)
-   - The `Docker Compose` plugin is also needed but should be installed
-     automatically
-- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/)
-
-Below, we provide instructions to set up all dependencies on a fresh VM (we
-tested on Ubuntu 20.04 and 22.04).
+For Ubuntu and Debian users, we provide a script `install.sh` to install all
+dependencies automatically:
 
 ```bash
-# Install dependencies
+# Install all dependencies. 
+# Note: the script will skip installation of any dependencies that you have already installed
+#        if you want install up-to-date packages, pass the flag "-f" to the script
 ./install.sh
 
-# enable docker group in the current shell
-# NOTE: to make it permanent, you should logout and login again
-newgrp docker
+# Note: if this is the first installation of Docker, logout from the current shell
+#        and login again to enable the "docker" group in the current user
 ```
+
+If you opt for a manual installation, make sure the following software
+components are installed and configured on the machine:
+- `git`, `make`, `screen` installed via apt: `sudo apt install -y git make screen`
+- [Docker](https://docs.docker.com/engine/install/)
+   - The [Docker Compose](https://docs.docker.com/compose/install/) plugin is also needed but should be installed
+     automatically with recent Docker versions
+- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/)
 
 In the end, make sure of the following:
 1. Docker is installed correctly: the `docker run --rm hello-world` command
    succeeds
+   - If you get a permission error, make sure [your user is in the "docker" group](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
 2. Docker Compose is installed: `docker compose version` succeeds
 3. Kubectl is installed: `kubectl version` succeeds
 4. Minikube is installed: `minikube version` succeeds

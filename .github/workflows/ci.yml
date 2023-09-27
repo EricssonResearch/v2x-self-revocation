@@ -8,10 +8,16 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     -
       uses: actions/checkout@master
+    -
+      name: Install dependencies
+      run: |
+        echo "" | ./install.sh -f
+        echo "" | ./install.sh
+      timeout-minutes: 5
     -
       name: Tamarin
       run: |
