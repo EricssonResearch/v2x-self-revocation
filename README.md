@@ -34,15 +34,15 @@ size of PRLs and the related impact on the V2X system for different scenarios.
 
 The repository contains the following sub-artifacts:
 
-- `prl`
-   contains scripts to generate and plot the markov matrices 
-   (Sec. VII-B / Appendix D)
 - `proofs`
    contains the Tamarin models used to formally verify our revocation scheme 
    (Sec. VI / Appendix B)
 - `simulation`
    Containing the code used for our evaluation 
    (Sec. VII-A / Appendix C)
+- `prl`
+   contains scripts to generate and plot the markov matrices 
+   (Sec. VII-B / Appendix D)
 
 A README is also included on each individual folder containing instructions to
 run the artifacts.
@@ -63,7 +63,7 @@ artifacts generated as output.
 
 ### Overview
 
-* [Getting started](#getting-started) (~10-30 human-minutes, ~15 compute-minutes)
+* [Getting started](#getting-started) (~1-30 human-minutes, ~5-15 compute-minutes)
 * [Kick-the-tires stage](#kick-the-tires-stage) (~8-10 human-minutes, ~14-16 compute-minutes)
 * [Tamarin models](#tamarin-models) (~2 human-minutes, ~10 compute-minutes)
 * [Simulations](#simulations) (~20-30 human-minutes, ~5 compute-hours)
@@ -125,7 +125,7 @@ started](#getting-started) instructions.
 # go to the `proofs` folder
 cd proofs
 
-# 2A: prove the lemma `all_heartbeats_processed_within_tolerance` of the `centralized-time` model (~5 seconds)
+# 1A: prove the lemma `all_heartbeats_processed_within_tolerance` of the `centralized-time` model (~5 seconds)
 #     Expected output: 
 #     - Tamarin computations and "summary of summaries" at the end
 #     - `all_heartbeats_processed_within_tolerance` marked as "verified"
@@ -133,7 +133,7 @@ cd proofs
 #     - a `output_centralized.spthy` file under `./out`
 make test MODEL=centralized-time OUT_FILE=output_centralized.spthy
 
-# 2B: prove the lemma `all_heartbeats_processed_within_tolerance` of the `distributed-time` model (~20 seconds)
+# 1B: prove the lemma `all_heartbeats_processed_within_tolerance` of the `distributed-time` model (~20 seconds)
 #     Expected output: 
 #     - Tamarin computations and "summary of summaries" at the end
 #     - `all_heartbeats_processed_within_tolerance` marked as "verified"
@@ -141,7 +141,7 @@ make test MODEL=centralized-time OUT_FILE=output_centralized.spthy
 #     - a `output_distributed.spthy` file under `./out`
 make test MODEL=distributed-time OUT_FILE=output_distributed.spthy
 
-# 2C: clean up (~1-5 seconds)
+# 1C: clean up (~1-5 seconds)
 make clean
 
 # go back to the root folder
@@ -156,7 +156,7 @@ Note: for step 3C, please follow the [Test instructions](./simulation/README.md#
 # go to the `simulation` folder
 cd simulation
 
-# 3A: create a new Minikube instance (~1-5 minutes)
+# 2A: create a new Minikube instance (~1-5 minutes)
 #     Note 1: by default we use all CPUs and half the memory in your machine
 #     You can override this by setting the MINIKUBE_CPUS and MINIKUBE_MEMORY variables
 #     Note 2: Make sure you are *not* running your shell as `root`, otherwise
@@ -167,15 +167,15 @@ cd simulation
 #     - kubectl works correctly: try running `kubectl get nodes`
 make run_minikube
 
-# 3B: build application from source on the Minikube instance (~3 minutes)
+# 2B: build application from source on the Minikube instance (~3 minutes)
 #     Expected output:
 #     - No error messages
 make build_minikube
 
-# 3C: run and interact with the application (~5 minutes)
+# 2C: run and interact with the application (~5 minutes)
 #     Please follow closely the "Test" section in "simulation/README.md" (see above)
 
-# 3D: Shut down application, delete minikube instance and remove files (~2 minutes)
+# 2D: Shut down application, delete minikube instance and remove files (~2 minutes)
 make clean_all
 
 # go back to the root folder
@@ -188,15 +188,15 @@ cd ..
 # go to the `prl` folder
 cd prl
 
-# 1A: test setup (~1-5 seconds)
+# 3A: test setup (~1-5 seconds)
 #     Expected output: markov matrix and the "Done" message, two cached files under `./cached`
 make test
 
-# 1B: single distribution (~3-5 minutes)
+# 3B: single distribution (~3-5 minutes)
 #     Expected output: markov matrix and "Done" message, two cached files under `./cached`
 make single
 
-# 1C: clean up (~1-5 seconds)
+# 3C: clean up (~1-5 seconds)
 make clean
 
 # go back to the root folder

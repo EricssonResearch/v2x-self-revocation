@@ -68,8 +68,8 @@ start() {
         echo "This means that if you have outdated versions installed, you *might* encounter problems when running the artifacts."
         echo "If you want to install up-to-date packages, run this script with '-f' instead."
     else
-        echo "You are running the script in *force* mode: I will replace any existing dependencies with the latest versions."
-        echo "If you do *not* want to overwrite the current versions, run this script without '-f' instead."
+        echo "You are running the script in *force* mode: any existing dependencies will be replaced with up-to-date versions."
+        echo "If you do *not* want to overwrite the current packages, run this script without '-f' instead."
     fi
     echo -e -n "${BGreen}"
     echo "Press ENTER to continue, or CTRL-C to exit"
