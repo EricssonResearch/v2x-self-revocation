@@ -90,13 +90,18 @@ dependencies automatically:
 ```
 
 If you opt for a manual installation, make sure the following software
-components are installed and configured on the machine:
-- `git`, `make`, `screen` installed via apt: `sudo apt install -y git make screen`
-- [Docker](https://docs.docker.com/engine/install/)
-   - The [Docker Compose](https://docs.docker.com/compose/install/) plugin is also needed but should be installed
-     automatically with recent Docker versions
-- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/)
+components are installed and configured on the machine. The table also shows the
+version that was used in our experiments, for reference (different versions
+should work as well). _Note_: the Docker Compose plugin should come together
+with recent Docker versions.
+
+| Software                                                   | Reference version                               |
+|------------------------------------------------------------|-------------------------------------------------|
+| `git`, `make`, `screen` (installed via package manager)    | `git`: 2.34.1, `make`: 4.3, `screen`: 4.09.00   |
+| [Docker](https://docs.docker.com/engine/install/)          | 23.0.2                                          |
+| [Docker Compose](https://docs.docker.com/compose/install/) | 2.17.2                                          |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/) | 1.28.2                            |
+| [Minikube](https://minikube.sigs.k8s.io/docs/start/)       | 1.31.2 (running Kubernetes 1.27.4)              |
 
 In the end, make sure of the following:
 1. Docker is installed correctly: the `docker run --rm hello-world` command
@@ -207,8 +212,8 @@ cd ..
 
 | Artifact     | Paper references    | Description                            |
 |--------------|---------------------|----------------------------------------|
-| `centralized-time` Tamarin model | Sect. VI, Appendix B, Figs. 3,4,9, Table I | Model and proofs that verify the properties defined in Sect. V-A, for the main design of Sect. V |
-| `distributed-time` Tamarin model | Appendix B, Fig. 10, Table II | Variant of the model that assumes a trusted time source in TCs, as discussed in Sect. V-B, and proofs |
+| `centralized-time` Tamarin model | Sect. VI, Appendix B, Table I | Model and proofs that verify the properties defined in Sect. V-A, for the main design of Sect. V |
+| `distributed-time` Tamarin model | Appendix B, Table II | Variant of the model that assumes a trusted time source in TCs, as discussed in Sect. V-B, and proofs |
 
 The steps for reproducing our results are the same as done in kick-the-tires
 stage, but this time we will ask Tamarin to verify _all_ lemmas.
