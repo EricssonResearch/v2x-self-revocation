@@ -320,6 +320,7 @@ cd ..
 
 | Artifact              | Paper references    | Description                            |
 |-----------------------|---------------------|----------------------------------------|
+| `probabilities`       | Sect. VII-B, Appendix D | Probabilities used for each scenario, and expected number of revocations |
 | `p-plot`              | Sect. VII-B, Fig. 6 | Plots percentiles for maximum PRL sizes under different scenarios and shares of attackers, with fixed `T_prl` and number of pseudonyms |
 | `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates `T_eff`, heartbeat frequency, heartbeat size, and required bandwidth under different values for `T_v` |
 | `tikz-graph`          | Appendix D, Fig. 15 | Simple transition graph |
@@ -333,43 +334,49 @@ depending on your hardware.
 # go to the `prl` folder
 cd prl
 
-# Step 1: transition graph (~1-5 seconds)
+# Step 1: compute probabilities (~1-5 seconds)
+#     Expected output:
+#     - probabilities and expected number of revocations printed to standard output
+#     - "All done!" message
+make probabilities
+
+# Step 2: transition graph (~1-5 seconds)
 #     Expected output:
 #     - markov matrix and the "Done" message printed to standard output
 #     - `tikz-graph.tex` plot under `./plots`
 make tikz
 
-# Step 2: Plot series over the different probabilities (~15-20 minutes)
+# Step 3: Plot series over the different probabilities (~15-20 minutes)
 #     Expected output: 
 #     - no errors printed to standard output
 #     - several distributions cached in `./cached` and plotted in `./plots/distributions`
 #     - plots `p-plot_n800_e30.{tex,png}` under `./plots`
 make p-plot
 
-# Step 3: Plot series over the number of pseudonyms (~25-35 minutes)
+# Step 4: Plot series over the number of pseudonyms (~25-35 minutes)
 #     Expected output:
 #     - no errors printed to standard output
 #     - several distributions cached in `./cached` and plotted in `./plots/distributions`
 #     - plots `n-plot_e30.{tex,png}` under `./plots`
 make n-plot
 
-# Step 4: Plot series over the time each pseudonym stays in the list (~90-140 minutes)
+# Step 5: Plot series over the time each pseudonym stays in the list (~90-140 minutes)
 #     Expected output:
 #     - no errors printed to standard output
 #     - several distributions cached in `./cached` and plotted in `./plots/distributions`
 #     - plots `t-plot_n800.{tex,png}` under `./plots`
 make t-plot
 
-# Step 5: Generate distribution for Tv (~15-20 minutes)
+# Step 6: Generate distribution for Tv (~15-20 minutes)
 #     Expected output:
 #     - no errors printed to standard output
 #     - several distributions cached in `./cached` and plotted in `./plots/distributions`
 #     - plots `tv-distribution.{tex,png}` under `./plots`
 make tv-distribution
 
-# Step 6 (optional): Copy results somewhere safe (`plots` folder will be deleted in the next step!)
+# Step 7 (optional): Copy results somewhere safe (`plots` folder will be deleted in the next step!)
 
-# Step 7: clean up
+# Step 8: clean up
 make clean
 
 # go back to the root folder

@@ -18,6 +18,9 @@ build-docker:
 test: init_dirs
 	$(DOCKER_CMD) python3 main.py -n 3 -p 0.01 -e 2 --cache-dir=$(CACHE_DIR) --allow-cached
 
+probabilities:
+	$(DOCKER_CMD) python3 probabilities.py
+
 single: init_dirs
 	$(DOCKER_CMD) python3 main.py -n 800 -p 0.000000116323325 -e 30 --cache-dir=$(CACHE_DIR) --allow-cached
 
@@ -52,7 +55,7 @@ check:
 	fi ; \
 	fi
 
-all: init_dirs check p-plot t-plot n-plot tv-distribution tikz
+all: init_dirs check probabilities p-plot t-plot n-plot tv-distribution tikz
 	@echo Successfully created all graphs!
 
 init_dirs:

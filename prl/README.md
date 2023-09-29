@@ -41,6 +41,7 @@ you have already generated, the faster the scripts will complete.
 | Target           | Time |
 | :--------------- | :--  |
 | test             | 1 second    |
+| probabilities    | 1 second    |
 | tikz             | 1 second    |
 | single           | 3 minutes   |
 | tv-distribution  | 18 minutes  |
@@ -161,8 +162,12 @@ below for how to do this manually.
 
 ### Reproducing the data used in the first plot
 
-The appendix explains more in-depth how the probabilities were calculated.
-For the plots, the following probabilities were used:
+The appendix explains more in-depth how the probabilities were calculated. The
+probabilities that we used can be re-computed by running the `probabilities.py`
+script (via `make probabilities`). This will also print the number of expected
+revocations for each scenario, as discussed in Section VII-B. The script should
+give as output the following probabilities:
+
 ```text
 Scenario 1: vehicles get revoked at least once a day with 1% probability
 0.000000116323325
@@ -181,7 +186,7 @@ Scenario 2: vehicles get revoked at least once a day with 99% probability
 0.000196612735153
 ```
 
-Then multiple plots can be generated at the same time with the
+Then, multiple plots can be generated at the same time with the
 `generate_plots.py` script (careful, only with python up to 3.8), which is
 wrapped in the [p-plot.sh](./scripts/p-plot.sh) script.
 

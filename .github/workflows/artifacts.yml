@@ -72,6 +72,11 @@ jobs:
     -
       uses: actions/checkout@master
     -
+      name: Probabilities
+      run: |
+        cd prl
+        make probabilities
+    -
       name: Transition graph
       run: |
         cd prl
