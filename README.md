@@ -1,5 +1,8 @@
 # Efficient and Timely Revocation of V2X Credentials
 
+[![test-running](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/ci.yml/badge.svg)](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/ci.yml)
+[![artifacts](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/artifacts.yml/badge.svg)](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/artifacts.yml)
+
 This repository contains software artifacts for the paper _Efficient and Timely
 Revocation of V2X Credentials_ that will appear at NDSS Symposium 2024.
 
