@@ -1,3 +1,4 @@
 quart==0.17.0
 environs==9.5.0
 jwcrypto==1.4.2
+Werkzeug==2.3.0

@@ -3,3 +3,4 @@ environs==9.5.0
 aiohttp==3.8.1
 asyncio-dgram==2.1.2
 PyJWT==2.4.0
+Werkzeug==2.3.0
