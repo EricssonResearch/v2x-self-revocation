@@ -3,7 +3,6 @@ FROM golang:1.19-buster AS build
 
 WORKDIR /app
 
-COPY go.mod ./
 COPY . .
 
 RUN go get tc && go build -o /tc
