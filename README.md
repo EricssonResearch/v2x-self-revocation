@@ -2,9 +2,17 @@
 
 [![test-running](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/ci.yml/badge.svg)](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/ci.yml)
 [![artifacts](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/artifacts.yml/badge.svg)](https://github.com/gianlucascopelliti/v2x-self-revocation/actions/workflows/artifacts.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10117921.svg)](https://doi.org/10.5281/zenodo.10117921)
 
 This repository contains software artifacts for the paper _Efficient and Timely
 Revocation of V2X Credentials_ that will appear at NDSS Symposium 2024.
+
+The evaluated artifacts for NDSS'24 are available at the `ndss-24-artifacts`
+[release](https://github.com/EricssonResearch/v2x-self-revocation/releases/tag/ndss-24-artifacts).
+A snapshot of the release has also been uploaded to
+[Zenodo](https://zenodo.org/records/10117921), containing a DOI and citation
+text. The `main` branch, instead, contains an up-to-date version of the code,
+which may present some differences compared to the evaluated one.
 
 ## Artifact Abstract
 
