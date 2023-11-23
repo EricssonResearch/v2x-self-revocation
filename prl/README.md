@@ -110,7 +110,7 @@ make all
 
 ### Simple tikz plot
 
-The appendix lists a simple transition graph (Fig. 15). The LaTeX Tikz code for
+The appendix lists a simple transition graph (Fig. 9). The LaTeX Tikz code for
 this can be generated with:
 
 ```bash
@@ -169,7 +169,7 @@ revocations for each scenario, as discussed in Section VII-B. The script should
 give as output the following probabilities:
 
 ```text
-Scenario 1: vehicles get revoked at least once a day with 1% probability
+Scenario 1: pseudonyms get revoked at least once a day with 1% probability
 0.000000116323325
 0.000007813830433
 0.000015511337541
@@ -177,7 +177,7 @@ Scenario 1: vehicles get revoked at least once a day with 1% probability
 0.000077091394407
 0.000154066465489
 
-Scenario 2: vehicles get revoked at least once a day with 99% probability
+Scenario 2: pseudonyms get revoked at least once a day with 99% probability
 0.000053299160406
 0.000060464839143
 0.000067630517880
@@ -228,10 +228,10 @@ For the appendix plots we used the [n-plot.sh](./scripts/n-plot.sh) and
 [t-plot.sh](./scripts/t-plot.sh) scripts.
 
 ```bash
-# n (number of vehicles) plot (Fig. 17)
+# n (number of pseudonyms) plot (Fig. 11)
 ./scripts/n-plot.sh
 
-# T_PRL plot (Fig. 16)
+# T_PRL plot (Fig. 10)
 ./scripts/t-plot.sh
 ```
 

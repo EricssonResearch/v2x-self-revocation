@@ -66,7 +66,7 @@ def main(
             help="Probability of a certificate being revoked.",
         ),
         tikz_file: Path = typer.Option(
-            None, "-f", help="Give a path to write the transition graph to a tikz file (Fig. 15 in paper).",
+            None, "-f", help="Give a path to write the transition graph to a tikz file (Fig. 9 in paper).",
                 exists=False, dir_okay=False, readable=True,
         ),
         plot: bool = typer.Option(

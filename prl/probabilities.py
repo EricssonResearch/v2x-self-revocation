@@ -36,7 +36,7 @@ print(f"Shares of attackers considered: {attackers}")
 print("Computing per-second revocation probabilities for each vehicle class and share of attackers..")
 probabilities = {}
 for vc in vehicle_classes:
-    # computing the per-second probability via geometric series (See Appendix D-D)
+    # computing the per-second probability via geometric series (See Appendix B-D)
     p =  1 - (1 - vehicle_classes[vc]["p"]) ** (1 / vehicle_classes[vc]["duration"])
 
     probabilities[vc] = {
@@ -55,15 +55,15 @@ for vc in vehicle_classes:
 print("Computing total (honest + malicious) probabilities for each scenario..")
 
 # h1 <-> Scenario 1: 
-# honest vehicles get revoked at least once a day with 1% probability
-# malicious vehicles get revoked every 30 minutes with 75% probabiity
+# honest pseudonyms get revoked at least once a day with 1% probability
+# malicious pseudonyms get revoked every 30 minutes with 75% probabiity
 h1 = np.add(probabilities["honest_1"]["attackers"], probabilities["malicious"]["attackers"])
 print(f"Probabilities Scenario 1")
 print_scenario(h1, attackers)
 
 # h2 <-> Scenario 2: 
-# honest vehicles get revoked at least once a day with 99% probability
-# malicious vehicles get revoked every 30 minutes with 75% probabiity
+# honest pseudonyms get revoked at least once a day with 99% probability
+# malicious pseudonyms get revoked every 30 minutes with 75% probabiity
 h2 = np.add(probabilities["honest_2"]["attackers"], probabilities["malicious"]["attackers"])
 print(f"Probabilities Scenario 2")
 print_scenario(h2, attackers)

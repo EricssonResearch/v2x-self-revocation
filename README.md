@@ -47,13 +47,13 @@ The repository contains the following sub-artifacts:
 
 - `proofs`
    contains the Tamarin models used to formally verify our revocation scheme 
-   (Sec. VI / Appendix B)
+   (Sect. VI / Appendix A)
 - `simulation`
    Containing the code used for our evaluation 
-   (Sec. VII-A / Appendix C)
+   (Sect. VII-A)
 - `prl`
    contains scripts to generate and plot the markov matrices 
-   (Sec. VII-B / Appendix D)
+   (Sect. VII-B / Appendix B)
 
 A README is also included on each individual folder containing instructions to
 run the artifacts.
@@ -223,8 +223,8 @@ cd ..
 
 | Artifact     | Paper references    | Description                            |
 |--------------|---------------------|----------------------------------------|
-| `centralized-time` Tamarin model | Sect. VI, Appendix B, Table I | Model and proofs that verify the properties defined in Sect. V-A, for the main design of Sect. V |
-| `distributed-time` Tamarin model | Appendix B, Table II | Variant of the model that assumes a trusted time source in TCs, as discussed in Sect. V-B, and proofs |
+| `centralized-time` Tamarin model | Sect. VI, Appendix A, Table I | Model and proofs that verify the properties defined in Sect. V-A, for the main design of Sect. V |
+| `distributed-time` Tamarin model | Appendix A, Table II | Variant of the model that assumes a trusted time source in TCs, as discussed in Sect. V-B, and proofs |
 
 The steps for reproducing our results are the same as done in kick-the-tires
 stage, but this time we will ask Tamarin to verify _all_ lemmas.
@@ -262,10 +262,14 @@ cd ..
 
 | Artifact        | Paper references        | Description                            |
 |-----------------|-------------------------|----------------------------------------|
-| `scenario-a1`   | Sect. VII-A, Fig. 5,11  | Box plots showing distributions of revocation times under different attacker classes, for T_v = 30 seconds and no trusted time in TCs |
-| `scenario-a2`   | Appendix C, Fig. 12     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 150 seconds and no trusted time in TCs |
-| `scenario-b1`   | Appendix C, Fig. 13     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 30 seconds and assuming a trusted time in TCs |
-| `scenario-b2`   | Appendix C, Fig. 14     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 150 seconds and assuming a trusted time in TCs |
+| `scenario-a1`   | Sect. VII-A, Fig. 5     | Box plots showing distributions of revocation times under different attacker classes, for T_v = 30 seconds and no trusted time in TCs |
+| `scenario-a2`   | Not in the paper        | Box plots showing distributions of revocation times under different attacker classes, for T_v = 150 seconds and no trusted time in TCs |
+| `scenario-b1`   | Not in the paper        | Box plots showing distributions of revocation times under different attacker classes, for T_v = 30 seconds and assuming a trusted time in TCs |
+| `scenario-b2`   | Not in the paper        | Box plots showing distributions of revocation times under different attacker classes, for T_v = 150 seconds and assuming a trusted time in TCs |
+
+Scenarios A2, B1 and B2 and corresponding plots have been removed from the paper
+due to page limits. However, we discuss them in the simulations'
+[README](./simulation/README.md#extended-discussion-of-our-results).
 
 In order to run the simulations locally and within a few hours, we provide a
 scaled-down configuration that spawns 50 vehicles and runs all simulations in
@@ -331,12 +335,12 @@ cd ..
 
 | Artifact              | Paper references    | Description                            |
 |-----------------------|---------------------|----------------------------------------|
-| `probabilities`       | Sect. VII-B, Appendix D | Probabilities used for each scenario, and expected number of revocations |
+| `probabilities`       | Sect. VII-B, Appendix B | Probabilities used for each scenario, and expected number of revocations |
 | `p-plot`              | Sect. VII-B, Fig. 6 | Plots percentiles for maximum PRL sizes under different scenarios and shares of attackers, with fixed `T_prl` and number of pseudonyms |
 | `tv-distribution`     | Sect. VII-B, Fig. 7 | Evaluates `T_eff`, heartbeat frequency, heartbeat size, and required bandwidth under different values for `T_v` |
-| `tikz-graph`          | Appendix D, Fig. 15 | Simple transition graph |
-| `n-plot`              | Appendix D, Fig. 16 | Plots 99th percentile for maximum PRL sizes under different number of pseudonyms, in four different scenarios |
-| `t-plot`              | Appendix D, Fig. 17 | Plots 99th percentile for maximum PRL sizes under different values for `T_prl`, in four different scenarios |
+| `tikz-graph`          | Appendix B, Fig. 9  | Simple transition graph |
+| `n-plot`              | Appendix B, Fig. 10 | Plots 99th percentile for maximum PRL sizes under different number of pseudonyms, in four different scenarios |
+| `t-plot`              | Appendix B, Fig. 11 | Plots 99th percentile for maximum PRL sizes under different values for `T_prl`, in four different scenarios |
 
 In total, this evaluation should take between **2.5 and 3.5 compute-hours**,
 depending on your hardware.

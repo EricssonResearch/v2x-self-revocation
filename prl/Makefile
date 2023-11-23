@@ -25,7 +25,7 @@ single: init_dirs
 	$(DOCKER_CMD) python3 main.py -n 800 -p 0.000000116323325 -e 30 --cache-dir=$(CACHE_DIR) --allow-cached
 
 tikz: init_dirs
-	@echo "Generating transition graph (Fig. 15)."
+	@echo "Generating transition graph (Fig. 9)."
 	$(DOCKER_CMD) python3 main.py -n 3 -p 0.1 -e 2 -f $(PLOT_DIR)/tikz-graph.tex
 
 p-plot: init_dirs

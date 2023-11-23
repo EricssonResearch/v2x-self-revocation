@@ -1,8 +1,7 @@
 # Simulation of a V2X scenario with self-revocation
 
 This folder contains instructions to run our simulation artifacts with
-Kubernets, to reproduce the results of Section VII and Appendix C of our
-paper.
+Kubernets, to reproduce the results of Section VII of our paper.
 
 ## Short description of the application
 
@@ -282,19 +281,22 @@ simulation ran for ~2 hours and spawned 360 "honest" vehicles and 40 "malicious"
 vehicles, and each used a different set of parameters for `T_V`, and
 `TRUSTED_TIME` (see [below](#parameters) for more info on these parameters).
 
-The table below, analogously to Table III in Appendix C, summarizes the setup of
-each scenario of the simulation:
+The table below summarizes the setup of each scenario of the simulation:
 
 | Scenario     | Link to paper       | Parameters                   |
 |--------------|---------------------|------------------------------|
 | Scenario A1  | Fig. 5, Sect. VII-A | `T_V=30`, `TRUSTED_TIME=0`   |
-| Scenario A2  | Fig. 12, Appendix C | `T_V=150`, `TRUSTED_TIME=0`  |
-| Scenario A1  | Fig. 13, Appendix C | `T_V=30`, `TRUSTED_TIME=1`   |
-| Scenario A1  | Fig. 14, Appendix C | `T_V=150`, `TRUSTED_TIME=1`  |
+| Scenario A2  | Not in the paper    | `T_V=150`, `TRUSTED_TIME=0`  |
+| Scenario B1  | Not in the paper    | `T_V=30`, `TRUSTED_TIME=1`   |
+| Scenario B2  | Not in the paper    | `T_V=150`, `TRUSTED_TIME=1`  |
 
 Additionally, each scenario ran four different simulations, each using a
 different attacker level. See Sect VII-A of our paper for more information on
 attacker levels.
+
+Scenarios A2, B1 and B2 and corresponding plots have been removed from the paper
+due to page limits. See [below](#extended-discussion-of-our-results) for a
+description of these results.
 
 ### Configure simulations
 
@@ -428,6 +430,58 @@ the command below.
 # Recompute plots from reference outputs
 make plot_all SIM_DIR=reference-outputs/
 ```
+
+## Extended discussion of our results
+
+This section extends Sect. VII-A of the paper with results from additional
+scenarios.
+
+### Plots
+
+**Scenario A1**
+
+![](reference-outputs/figs/scenario-a1_verify.svg)
+
+**Scenario A2**
+
+![](reference-outputs/figs/scenario-a2_verify.svg)
+
+**Scenario B1**
+
+![](reference-outputs/figs/scenario-b1_verify.svg)
+
+**Scenario B2**
+
+![](reference-outputs/figs/scenario-b2_verify.svg)
+
+
+### Discussion
+
+Recall from Sect. VII-A of the paper that each value of the boxes represents the
+time between the revocation of a pseudonym `ps` (`REVOKE` event) and the last
+V2V message signed with `ps` that was verified by a non-malicious TC
+(`VERIFY` event). The latter time represents the *effective revocation
+time* for that particular pseudonym `ps`. The box plots give the distribution of
+such values, obtained aggregating more than 600 revocations, filtering out
+negative values.
+
+The figures show one significant difference between the main design (A1 and A2)
+and the extension with a local trusted time source (B1 and B2): While in the
+former most revocations are effective around or before `T_v`, in the latter
+attackers are able to postpone revocation up until `T_eff` in some cases,
+i.e., it appears easier to reach the upper bound, especially for powerful
+attackers such as the `smart` one. This is due to the fact that, while
+in the main design revoked TCs cannot synchronize their time since
+`t_rev`, with a local time source TCs can still advance their internal
+time up until `t_rev + T_v`, before triggering the automatic
+revocation logic. That is, in the latter case a revoked TC is able to
+generate ''more fresh'' V2V messages, which can be processed by other
+TCs later in time.
+
+This peculiarity suggests that a local trusted time source negatively affects
+the revocation time. While this may be true in the average case, it still does
+not affect the worst-case effective revocation time `T_eff`, as shown in the
+figures.
 
 ## Parameters
 
