@@ -25,10 +25,13 @@ for line in lines:
       add_goal(1, num)
     if "tout" not in line and (
       ("('1'+t_rev+z+z.1)" in line and "('1'+'1'+t.1)" in line) or
-      ("('1'+t_rev+tv+z+z.1)" in line and "('1'+'1'+tv+t.1)" in line)
+      ("('1'++t_rev++z++z.1)" in line and "('1'++'1'++t.1)" in line) or
+      ("('1'+t_rev+tv+z+z.1)" in line and "('1'+'1'+tv+t.1)" in line) or
+      ("('1'++t_rev++tv++z++z.1)" in line and "('1'++'1'++tv++t.1)" in line)
     ):
       add_goal(2, num)
-    elif "!Time( ('1'+t_rev+z)" in line or "!Time( ('1'+t_rev+tv+z)" in line:
+    elif "!Time( ('1'+t_rev+z)" in line or "!Time( ('1'++t_rev++z)" in line or \
+    "!Time( ('1'+t_rev+tv+z)" in line or "!Time( ('1'++t_rev++tv++z)" in line:
       add_goal(3, num)
     elif "!KU( sign(<prl.1, t_hb>, ~ltk)" in line:
       add_goal(4, num)    
@@ -50,9 +53,11 @@ for line in lines:
       add_goal(2, num)
     elif "!KU( sign(<prl, t_hb>, ~ltk)" in line:
       add_goal(3, num)
-    elif "!Time( ('1'+t_rev+z)" in line or "!Time( ('1'+t_rev+tv+z)" in line:
+    elif "!Time( ('1'+t_rev+z)" in line or "!Time( ('1'++t_rev++z)" in line or \
+        "!Time( ('1'+t_rev+tv+z)" in line or "!Time( ('1'++t_rev++tv++z)" in line:
       add_goal(4, num)
-    if "(('1'+t_rev+z)" in line or "(('1'+t_rev+tv+z)" in line:
+    if "(('1'+t_rev+z)" in line or "(('1'++t_rev++z)" in line or \
+        "(('1'+t_rev+tv+z)" in line or "(('1'++t_rev++tv++z)" in line:
       add_goal(5, num)
     elif "!Timeout" in line:
       add_goal(6, num)
@@ -109,7 +114,8 @@ for line in lines:
   elif lemma in [
     "effective_revocation"
   ]:
-    if "((t_v2v+tv.1) = (t_rev+z+tv.1+tv.1))" in line:
+    if "((t_v2v+tv.1) = (t_rev+z+tv.1+tv.1))" in line or \
+      "((t_v2v++tv.1) = (t_rev++z++tv.1++tv.1))" in line:
       add_goal(1, num)
     else:
       add_goal(900, num)

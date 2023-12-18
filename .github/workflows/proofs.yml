@@ -1,0 +1,35 @@
+name: proofs
+on:
+  workflow_dispatch:
+
+jobs:
+  proofs:
+    runs-on: ubuntu-22.04
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: Run main design (centralized-time)
+      run: |
+        cd proofs
+        make prove MODEL=centralized-time THREADS=4 OUT_FILE=output_centralized.spthy
+        docker logs -n 200 tamarin > out/log_centralized.txt
+      timeout-minutes: 10
+    -
+      name: Run alternative design (distributed-time)
+      run: |
+        cd proofs
+        make prove MODEL=distributed-time THREADS=4 OUT_FILE=output_distributed.spthy
+        docker logs -n 200 tamarin > out/log_distributed.txt
+      timeout-minutes: 10
+    -
+      name: Remove temp files
+      run: |
+        cd proofs
+        rm -rf out/theory.spthy out/oracle.py
+    - 
+      name: Upload results
+      uses: actions/upload-artifact@v3
+      with:
+        name: proofs
+        path: proofs/out

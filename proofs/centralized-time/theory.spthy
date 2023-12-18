@@ -329,6 +329,7 @@ rule RA_issue_revocation:
         !Time('RA', t)
       , !Pseudonym(ps)
       , !PRL(prl, cnt)
+      , In(prl) // helps with partial deconstructions. PRL is public anyway.
     ]
     --[ 
         /* restrictions */
@@ -349,6 +350,8 @@ rule RA_issue_revocation:
 rule RA_advance_time:
     [
         !Time('RA', t)
+      , In(t) // helps with partial deconstructions. Time is public anyway.
+
     ]
     --[ 
         /* restrictions */

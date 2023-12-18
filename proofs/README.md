@@ -17,10 +17,8 @@ V-B). These models are divided in two sub-folders:
 Both models are defined in the files called `theory.spthy`. 
 
 We successfully verified all the lemmas in the models using Tamarin version
-`1.6.1`. Outputs from previous executions are found in `output.txt` and
-`output.spthy`. Very recently, Tamarin released version `1.8.0`: We failed to
-verify our models with this version as we experienced a much higher memory and
-CPU utilization. We will investigate this issue in the future.
+`1.6.1` and `1.8.0`. Outputs from previous executions are found in `output.txt`
+and `output.spthy`.
 
 The oracles `oracle.py` help Tamarin to create efficient proofs and allow it to
 terminate. Without it, Tamarin would either use too much memory or get stuck in
@@ -49,8 +47,8 @@ Dockerfile to install Python 3, in order to run our oracles.
 
 The Docker images are publicly available at `selfrevocation/tamarin`. Different
 tags use different Tamarin versions:
-- `latest` (or `v1.7.1`) was built from commit
-  `ba7f2b8b259c3808441b093b4fff039430753332`.
+- `latest` (or `v1.8.0`) was built from tag `1.8.0`, which corresponds to the
+  official Tamarin release `1.8.0`.
 - `v1.6.1` was built from tag `1.6.1`, which corresponds to the official
   Tamarin release `1.6.1`.
 
@@ -131,21 +129,32 @@ make clean
 
 ## Run locally
 
-Python 3 is required to run the oracles: `sudo apt install python3`
+Python 3 is required to run the oracles: `sudo apt install python3`.
+[Homebrew](https://brew.sh/) is also required to install Tamarin.
 
-**NOTE**: As mentioned above, Tamarin `1.8.0` is currently not able to verify
-our models efficiently. The instructions below will install Tamarin `1.6.1`.
+Below we give instructions to install the latest Tamarin version (currently
+1.8.0), or version 1.6.1. Choose the version you prefer. More installation
+instructions are provided
+[here](https://tamarin-prover.com/manual/master/book/002_installation.html).
 
-### Tamarin installation
+### Tamarin installation (LATEST VERSION)
 
-First of all, install [Homebrew](https://brew.sh/) and make sure that the `brew`
-command works. Then, install Tamarin as shown below:
+```bash
+# Install Tamarin
+brew install tamarin-prover/tap/tamarin-prover
+
+# Check version
+tamarin-prover --version
+```
+
+
+### Tamarin installation (VERSION 1.6.1)
 
 ```bash
 # Get brew formula of Tamarin 1.6.1
 wget https://raw.githubusercontent.com/tamarin-prover/homebrew-tap/e6696f0f3c1f131b633c98aa657c5792c6d07737/Formula/tamarin-prover.rb -O tamarin-prover.rb
 
-# Install tamarin
+# Install Tamarin
 brew install tamarin-prover.rb
 
 # Check that we have indeed installed tamarin 1.6.1

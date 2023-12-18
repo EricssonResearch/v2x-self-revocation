@@ -77,7 +77,7 @@ for line in lines:
       add_goal(50, num)
     elif "!KU(" in line and not "sign" in line:
       add_goal(60, num)
-    elif "'1'+'1'" in line:
+    elif "'1'+'1'" in line or "'1'++'1'" in line:
       add_goal(70, num)
 
     # hard goals
@@ -139,11 +139,14 @@ for line in lines:
       add_goal(3, num)
     elif "!KU( sign(<prl.2, t>, ~ltk)" in line:
       add_goal(4, num)
-    elif "#vr < #k" in line and "cnt+z" in line:
+    elif "#vr < #k" in line and ("cnt+z" in line or "cnt++z" in line):
       add_goal(5, num)
-    elif "#k < #vr.3" in line and "'1'+cnt" in line:
+    elif "#k < #vr.3" in line and ("'1'+cnt" in line or "'1'++cnt" in line):
       add_goal(6, num)
-    elif "t_rev" in line and ("('1'+'1'+t)" in line or "('1'+'1'+t+tv)" in line):
+    elif "t_rev" in line and (
+      "('1'+'1'+t)" in line or "('1'++'1'++t)" in line or
+      "('1'+'1'+t+tv)" in line or "('1'++'1'++t++tv)" in line
+      ):
       add_goal(7, num)
 
   elif lemma in [
@@ -169,11 +172,11 @@ for line in lines:
     # constraints
     elif "#vr." in line and ("#j" in line or "#k" in line):
       add_goal(40, num)
-    elif "!Time" not in line and "('1'+t+tv)" in line:
+    elif "!Time" not in line and ("('1'+t+tv)" in line or "('1'++t++tv)" in line):
       add_goal(41, num)
-    elif "('1'+t)" in line:
+    elif "('1'+t)" in line or "('1'++t)" in line:
       add_goal(42, num)
-    elif "'1'+" in line:
+    elif "'1'+" in line or "'1'++" in line:
       add_goal(43, num)
     elif "!Time( 'TC'" in line:
       add_goal(100, num)
