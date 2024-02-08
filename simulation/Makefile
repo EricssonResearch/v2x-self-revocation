@@ -71,6 +71,9 @@ run_kubernetes: gen_ra_key
 	scripts/deploy.sh res/deployments/area/vehicle.yaml VERSION=$(VERSION) NUM_VEHICLES=$(NUM_VEHICLES) LOG_DIR=$(LOG_DIR_MOUNT)
 	scripts/deploy.sh res/deployments/area/attacker.yaml VERSION=$(VERSION) NUM_ATTACKERS=$(NUM_ATTACKERS) LOG_DIR=$(LOG_DIR_MOUNT)
 
+run_vehiclesec_demo:
+	make run_kubernetes ENV_FILE=vehiclesec.env
+
 scale_vehicles:
 	kubectl -n v2x scale --replicas $(NUM_VEHICLES) deployment vehicle
 
