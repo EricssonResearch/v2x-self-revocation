@@ -5,7 +5,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10210425.svg)](https://doi.org/10.5281/zenodo.10210425)
 
 This repository contains software artifacts for the paper _Efficient and Timely
-Revocation of V2X Credentials_ that will appear at NDSS Symposium 2024. The
+Revocation of V2X Credentials_ that will appear at [NDSS Symposium 2024](https://www.ndss-symposium.org/ndss-paper/efficient-and-timely-revocation-of-v2x-credentials/). The
 camera-ready version of the paper is available
 [here](https://bobspot.org/assets/docs/2023-11-ndss-v2x.pdf).
 
