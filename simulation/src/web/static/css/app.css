@@ -159,4 +159,8 @@ circle.revoked {
   .revoked-ps {
     margin-left: calc(50vw - 970px);
   }
+
+  #myToast {
+    margin-right: calc(50vw - 970px);
+  }
  }
